@@ -1,0 +1,37 @@
+import { Sequelize } from "sequelize-typescript";
+import { User } from "@/models/User";
+import { Plan } from "@/models/Plan";
+
+const DATABASE_URL = process.env.DATABASE_URL!;
+
+let sequelize: Sequelize;
+
+declare global {
+  // eslint-disable-next-line no-var
+  var __sequelize: Sequelize | undefined;
+}
+
+if (process.env.NODE_ENV === "production") {
+  sequelize = new Sequelize(DATABASE_URL, {
+    dialect: "postgres",
+    logging: false,
+    dialectOptions: {
+      ssl: {
+        require: true,
+        rejectUnauthorized: false,
+      },
+    },
+    models: [User, Plan],
+  });
+} else {
+  if (!global.__sequelize) {
+    global.__sequelize = new Sequelize(DATABASE_URL, {
+      dialect: "postgres",
+      logging: false,
+      models: [User, Plan],
+    });
+  }
+  sequelize = global.__sequelize;
+}
+
+export { sequelize };
