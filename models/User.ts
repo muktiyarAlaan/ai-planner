@@ -8,11 +8,9 @@ import {
   Default,
   Unique,
   AllowNull,
-  HasMany,
   CreatedAt,
   UpdatedAt,
 } from "sequelize-typescript";
-import { Plan } from "./Plan";
 
 @Table({
   tableName: "Users",
@@ -54,7 +52,4 @@ export class User extends Model {
 
   @UpdatedAt
   declare updatedAt: Date;
-
-  @HasMany(() => Plan)
-  declare plans: Plan[];
 }
