@@ -11,6 +11,19 @@ const nextConfig = {
   },
   // Sequelize uses some Node.js built-ins that need to be marked as external
   serverExternalPackages: ["sequelize", "sequelize-typescript", "pg", "pg-hstore"],
+  webpack: (config, { isServer }) => {
+    if (isServer) {
+      config.externals = [
+        ...(Array.isArray(config.externals) ? config.externals : [config.externals].filter(Boolean)),
+        "pg",
+        "pg-hstore",
+        "pg-native",
+        "sequelize",
+        "sequelize-typescript",
+      ];
+    }
+    return config;
+  },
 };
 
 export default nextConfig;

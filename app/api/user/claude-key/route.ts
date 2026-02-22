@@ -1,15 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { getSession } from "@/lib/get-session";
 import { encrypt } from "@/lib/crypto";
 import { validateAnthropicKey } from "@/lib/anthropic";
 import { sequelize } from "@/lib/sequelize";
 import { User } from "@/models/User";
 
 export async function POST(request: NextRequest) {
-  const session = await getServerSession(authOptions);
+  const session = await getSession();
 
-  if (!session?.user?.id) {
+  if (!session?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -56,7 +55,7 @@ export async function POST(request: NextRequest) {
 
     await User.update(
       { claudeApiKey: encryptedKey },
-      { where: { id: session.user.id } }
+      { where: { id: session.id } }
     );
 
     return NextResponse.json({ success: true });
@@ -70,9 +69,9 @@ export async function POST(request: NextRequest) {
 }
 
 export async function DELETE() {
-  const session = await getServerSession(authOptions);
+  const session = await getSession();
 
-  if (!session?.user?.id) {
+  if (!session?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -80,7 +79,7 @@ export async function DELETE() {
     await sequelize.authenticate();
     await User.update(
       { claudeApiKey: null },
-      { where: { id: session.user.id } }
+      { where: { id: session.id } }
     );
     return NextResponse.json({ success: true });
   } catch (error) {

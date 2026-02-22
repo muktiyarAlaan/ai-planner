@@ -32,6 +32,11 @@ if (process.env.NODE_ENV === "production") {
     });
   }
   sequelize = global.__sequelize;
+  // Re-register models on every module load to handle hot-reload in development.
+  // After a reload, the cached sequelize instance holds stale model classes, so
+  // any direct model import (e.g. User.findOrCreate) would fail with
+  // "needs to be added to a Sequelize instance".
+  sequelize.addModels([User, Plan]);
 }
 
 export { sequelize };

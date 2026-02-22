@@ -47,6 +47,14 @@ export class User extends Model {
   @Column(DataType.STRING)
   declare linearTeamId: string | null;
 
+  @AllowNull(true)
+  @Column(DataType.STRING)
+  declare githubAccessToken: string | null;
+
+  @AllowNull(true)
+  @Column(DataType.JSONB)
+  declare githubRepos: { fullName: string; owner: string; repo: string }[] | null;
+
   @CreatedAt
   declare createdAt: Date;
 

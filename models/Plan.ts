@@ -65,9 +65,21 @@ export class Plan extends Model {
   @Column(DataType.JSONB)
   declare linearTickets: object | null;
 
-  @Default("claude-sonnet-4-6")
+  @AllowNull(true)
+  @Column(DataType.JSONB)
+  declare securityReview: object | null;
+
+  @Default("gemini-2.0-flash-lite")
   @Column(DataType.STRING)
   declare model: string;
+
+  @AllowNull(true)
+  @Column({ type: DataType.STRING, unique: true })
+  declare shareToken: string | null;
+
+  @Default(false)
+  @Column(DataType.BOOLEAN)
+  declare isShared: boolean;
 
   @CreatedAt
   declare createdAt: Date;

@@ -1,9 +1,15 @@
-import { SessionProvider } from "@/components/session-provider";
+import { redirect } from "next/navigation";
+import { getSession } from "@/lib/get-session";
 
-export default function AuthLayout({
+export default async function AuthLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  return <SessionProvider session={null}>{children}</SessionProvider>;
+  const user = await getSession();
+  if (user) {
+    redirect("/dashboard");
+  }
+
+  return <>{children}</>;
 }
