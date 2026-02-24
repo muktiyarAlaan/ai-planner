@@ -9,12 +9,11 @@ const nextConfig = {
       },
     ],
   },
-  // Bundle sequelize and pg into the serverless function via webpack.
-  // When sequelize is marked as serverExternalPackages, Vercel's file tracer
-  // runs AFTER sequelize's code and misses its dynamic require('pg') call,
-  // causing "Please install pg package manually" at runtime.
-  // By bundling everything, webpack intercepts require('pg') and resolves it
-  // from the bundle — no filesystem lookup needed at runtime.
+  // Keep pg and sequelize as external packages so Vercel's file tracer
+  // includes them in the serverless function deployment. Sequelize dynamically
+  // requires 'pg' via its dialect loader — bundling breaks this resolution,
+  // while external mode lets Node resolve it from node_modules at runtime.
+  serverExternalPackages: ["pg", "pg-hstore", "sequelize", "sequelize-typescript"],
   webpack: (config, { isServer }) => {
     if (isServer) {
       config.externals = [
