@@ -1,4 +1,5 @@
 import { Sequelize } from "sequelize-typescript";
+import pg from "pg";
 import { User } from "@/models/User";
 import { Plan } from "@/models/Plan";
 import { AgentContext } from "@/models/AgentContext";
@@ -15,6 +16,7 @@ function buildSequelize(): Sequelize {
   if (process.env.NODE_ENV === "production") {
     return new Sequelize(url, {
       dialect: "postgres",
+      dialectModule: pg,
       logging: false,
       dialectOptions: {
         ssl: {
@@ -29,6 +31,7 @@ function buildSequelize(): Sequelize {
   if (!global.__sequelize) {
     global.__sequelize = new Sequelize(url, {
       dialect: "postgres",
+      dialectModule: pg,
       logging: false,
       models: [User, Plan, AgentContext],
     });
