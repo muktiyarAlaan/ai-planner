@@ -9,6 +9,8 @@ interface Props {
   onUpdate: (reqs: PlanRequirements) => void;
 }
 
+type SectionKey = keyof PlanRequirements;
+
 // ── Auto-growing textarea ─────────────────────────────────────────────────────
 function AutoTextarea({
   value,
@@ -119,7 +121,7 @@ function ReqItem({
           </svg>
         </div>
       )}
-      <span className={`text-sm leading-relaxed flex-1 ${isOutOfScope ? "text-[#94a3b8] line-through decoration-[#cbd5e1]" : "text-[#374151]"}`}>
+      <span className={`text-sm leading-relaxed flex-1 ${isOutOfScope ? "text-[#64748b]" : "text-[#374151]"}`}>
         {text}
       </span>
       <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover/item:opacity-100 transition-opacity">
@@ -236,6 +238,12 @@ export function RequirementsTab({ requirements, planId, onUpdate }: Props) {
   const [reqs, setReqs] = useState<PlanRequirements>(
     requirements ?? { functional: [], nonFunctional: [], outOfScope: [] }
   );
+  const [query, setQuery] = useState("");
+  const [collapsed, setCollapsed] = useState<Record<SectionKey, boolean>>({
+    functional: false,
+    nonFunctional: false,
+    outOfScope: false,
+  });
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   function persist(updated: PlanRequirements) {
@@ -255,23 +263,54 @@ export function RequirementsTab({ requirements, planId, onUpdate }: Props) {
     }, 600);
   }
 
-  function updateItem(section: keyof PlanRequirements, i: number, text: string) {
+  function updateItem(section: SectionKey, i: number, text: string) {
     const arr = [...(reqs[section] ?? [])];
     if (i < arr.length) arr[i] = text;
     else arr.push(text);
     persist({ ...reqs, [section]: arr });
   }
 
-  function deleteItem(section: keyof PlanRequirements, i: number) {
+  function deleteItem(section: SectionKey, i: number) {
     const arr = [...(reqs[section] ?? [])];
     arr.splice(i, 1);
     persist({ ...reqs, [section]: arr });
   }
 
-  function addItem(section: keyof PlanRequirements, text: string) {
+  function addItem(section: SectionKey, text: string) {
     const arr = [...(reqs[section] ?? []), text];
     persist({ ...reqs, [section]: arr });
   }
+
+  function filteredItems(section: SectionKey) {
+    const q = query.trim().toLowerCase();
+    const items = reqs[section] ?? [];
+    if (!q) return items.map((text, index) => ({ text, index }));
+    return items
+      .map((text, index) => ({ text, index }))
+      .filter(({ text }) => text.toLowerCase().includes(q));
+  }
+
+  function toggleSection(section: SectionKey) {
+    setCollapsed((prev) => ({ ...prev, [section]: !prev[section] }));
+  }
+
+  function setAllCollapsed(next: boolean) {
+    setCollapsed({
+      functional: next,
+      nonFunctional: next,
+      outOfScope: next,
+    });
+  }
+
+  const functionalItems = filteredItems("functional");
+  const nonFunctionalItems = filteredItems("nonFunctional");
+  const outOfScopeItems = filteredItems("outOfScope");
+  const totalItems =
+    (reqs.functional?.length ?? 0) +
+    (reqs.nonFunctional?.length ?? 0) +
+    (reqs.outOfScope?.length ?? 0);
+  const visibleItems = functionalItems.length + nonFunctionalItems.length + outOfScopeItems.length;
+  const allCollapsed = collapsed.functional && collapsed.nonFunctional && collapsed.outOfScope;
 
   if (!requirements && reqs.functional.length === 0 && reqs.nonFunctional.length === 0) {
     return (
@@ -283,71 +322,166 @@ export function RequirementsTab({ requirements, planId, onUpdate }: Props) {
 
   return (
     <div className="p-6 overflow-y-auto h-full">
-      <div className="grid grid-cols-2 gap-6 mb-6">
+      <div className="bg-white border border-[#e2e8f0] rounded-xl p-4 mb-5">
+        <div className="flex items-start justify-between gap-3 flex-wrap">
+          <div>
+            <h2 className="text-sm font-semibold text-[#334155]">Requirements</h2>
+            <p className="text-xs text-[#64748b] mt-0.5">
+              {visibleItems} visible of {totalItems} total
+            </p>
+          </div>
+          <button
+            onClick={() => setAllCollapsed(!allCollapsed)}
+            className="text-xs font-medium text-[#64748b] border border-[#e2e8f0] bg-white hover:bg-[#f8fafc] px-2.5 py-1.5 rounded-md transition-colors"
+          >
+            {allCollapsed ? "Expand all" : "Collapse all"}
+          </button>
+        </div>
+        <div className="mt-3 relative">
+          <svg className="w-4 h-4 text-[#94a3b8] absolute left-3 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="m21 21-4.35-4.35M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15Z" />
+          </svg>
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search requirements..."
+            className="w-full text-sm text-[#374151] bg-white border border-[#dbe3ee] rounded-lg pl-9 pr-8 py-2 focus:outline-none focus:border-[#7C3AED]/40 focus:ring-2 focus:ring-[#7C3AED]/15"
+          />
+          {query && (
+            <button
+              onClick={() => setQuery("")}
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-[#94a3b8] hover:text-[#64748b]"
+              title="Clear search"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18 18 6M6 6l12 12" />
+              </svg>
+            </button>
+          )}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 mb-6">
         {/* Functional */}
         <div className="bg-white border border-[#e2e8f0] rounded-xl p-5">
-          <h3 className="text-xs font-semibold text-[#64748b] uppercase tracking-wider mb-3">
-            Functional Requirements
-          </h3>
-          <div className="space-y-2.5">
-            {(reqs.functional ?? []).map((req, i) => (
-              <ReqItem
-                key={i}
-                text={req}
-                onSave={(text) => updateItem("functional", i, text)}
-                onDelete={() => deleteItem("functional", i)}
+          <button
+            onClick={() => toggleSection("functional")}
+            className="w-full flex items-center justify-between mb-3"
+          >
+            <h3 className="text-xs font-semibold text-[#64748b] uppercase tracking-wider">
+              Functional Requirements
+            </h3>
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] text-[#94a3b8]">{functionalItems.length}</span>
+              <svg className={`w-3.5 h-3.5 text-[#94a3b8] transition-transform ${collapsed.functional ? "-rotate-90" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="m19 9-7 7-7-7" />
+              </svg>
+            </div>
+          </button>
+          {!collapsed.functional && (
+            <>
+              <div className="space-y-2.5">
+                {functionalItems.length > 0 ? (
+                  functionalItems.map(({ text, index }) => (
+                    <ReqItem
+                      key={index}
+                      text={text}
+                      onSave={(nextText) => updateItem("functional", index, nextText)}
+                      onDelete={() => deleteItem("functional", index)}
+                    />
+                  ))
+                ) : (
+                  <p className="text-xs text-[#94a3b8]">No matching functional requirements.</p>
+                )}
+              </div>
+              <AddItemRow
+                onAdd={(text) => addItem("functional", text)}
+                placeholder="Enter functional requirement..."
               />
-            ))}
-          </div>
-          <AddItemRow
-            onAdd={(text) => addItem("functional", text)}
-            placeholder="Enter functional requirement…"
-          />
+            </>
+          )}
         </div>
 
         {/* Non-Functional */}
         <div className="bg-white border border-[#e2e8f0] rounded-xl p-5">
-          <h3 className="text-xs font-semibold text-[#64748b] uppercase tracking-wider mb-3">
-            Non-Functional Requirements
-          </h3>
-          <div className="space-y-2.5">
-            {(reqs.nonFunctional ?? []).map((req, i) => (
-              <ReqItem
-                key={i}
-                text={req}
-                onSave={(text) => updateItem("nonFunctional", i, text)}
-                onDelete={() => deleteItem("nonFunctional", i)}
-                icon={<div className="w-4 h-4 rounded border border-[#e2e8f0] bg-[#f8fafc] mt-0.5 shrink-0" />}
+          <button
+            onClick={() => toggleSection("nonFunctional")}
+            className="w-full flex items-center justify-between mb-3"
+          >
+            <h3 className="text-xs font-semibold text-[#64748b] uppercase tracking-wider">
+              Non-Functional Requirements
+            </h3>
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] text-[#94a3b8]">{nonFunctionalItems.length}</span>
+              <svg className={`w-3.5 h-3.5 text-[#94a3b8] transition-transform ${collapsed.nonFunctional ? "-rotate-90" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="m19 9-7 7-7-7" />
+              </svg>
+            </div>
+          </button>
+          {!collapsed.nonFunctional && (
+            <>
+              <div className="space-y-2.5">
+                {nonFunctionalItems.length > 0 ? (
+                  nonFunctionalItems.map(({ text, index }) => (
+                    <ReqItem
+                      key={index}
+                      text={text}
+                      onSave={(nextText) => updateItem("nonFunctional", index, nextText)}
+                      onDelete={() => deleteItem("nonFunctional", index)}
+                    />
+                  ))
+                ) : (
+                  <p className="text-xs text-[#94a3b8]">No matching non-functional requirements.</p>
+                )}
+              </div>
+              <AddItemRow
+                onAdd={(text) => addItem("nonFunctional", text)}
+                placeholder="Enter non-functional requirement..."
               />
-            ))}
-          </div>
-          <AddItemRow
-            onAdd={(text) => addItem("nonFunctional", text)}
-            placeholder="Enter non-functional requirement…"
-          />
+            </>
+          )}
         </div>
       </div>
 
       {/* Out of scope */}
       <div className="bg-white border border-[#e2e8f0] rounded-xl p-5">
-        <h3 className="text-xs font-semibold text-[#94a3b8] uppercase tracking-wider mb-3">
-          Out of Scope
-        </h3>
-        <div className="space-y-1.5">
-          {(reqs.outOfScope ?? []).map((item, i) => (
-            <ReqItem
-              key={i}
-              text={item}
-              isOutOfScope
-              onSave={(text) => updateItem("outOfScope", i, text)}
-              onDelete={() => deleteItem("outOfScope", i)}
+        <button
+          onClick={() => toggleSection("outOfScope")}
+          className="w-full flex items-center justify-between mb-3"
+        >
+          <h3 className="text-xs font-semibold text-[#94a3b8] uppercase tracking-wider">
+            Out of Scope
+          </h3>
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] text-[#94a3b8]">{outOfScopeItems.length}</span>
+            <svg className={`w-3.5 h-3.5 text-[#94a3b8] transition-transform ${collapsed.outOfScope ? "-rotate-90" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="m19 9-7 7-7-7" />
+            </svg>
+          </div>
+        </button>
+        {!collapsed.outOfScope && (
+          <>
+            <div className="space-y-1.5">
+              {outOfScopeItems.length > 0 ? (
+                outOfScopeItems.map(({ text, index }) => (
+                  <ReqItem
+                    key={index}
+                    text={text}
+                    isOutOfScope
+                    onSave={(nextText) => updateItem("outOfScope", index, nextText)}
+                    onDelete={() => deleteItem("outOfScope", index)}
+                  />
+                ))
+              ) : (
+                <p className="text-xs text-[#94a3b8]">No matching out-of-scope items.</p>
+              )}
+            </div>
+            <AddItemRow
+              onAdd={(text) => addItem("outOfScope", text)}
+              placeholder="Enter out-of-scope item..."
             />
-          ))}
-        </div>
-        <AddItemRow
-          onAdd={(text) => addItem("outOfScope", text)}
-          placeholder="Enter out-of-scope item…"
-        />
+          </>
+        )}
       </div>
     </div>
   );

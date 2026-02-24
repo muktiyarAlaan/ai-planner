@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
@@ -10,6 +10,11 @@ interface Question {
   question: string;
   type: "MULTI_CHOICE" | "FREE_TEXT";
   options?: string[];
+}
+
+interface PodOption {
+  podName: string;
+  title: string;
 }
 
 const GENERATING_PHASES = [
@@ -27,6 +32,9 @@ export default function NewPlanPage() {
   const [requirement,        setRequirement]        = useState("");
   const [context,            setContext]            = useState("");
   const [showContext,        setShowContext]        = useState(false);
+  const [selectedPods,       setSelectedPods]       = useState<string[]>([]);
+  const [isPodMenuOpen,      setIsPodMenuOpen]      = useState(false);
+  const [pods,               setPods]               = useState<PodOption[]>([]);
   const [loadingQuestions,   setLoadingQuestions]   = useState(false);
   const [questionsError,     setQuestionsError]     = useState("");
   const [questions,          setQuestions]          = useState<Question[]>([]);
@@ -40,6 +48,47 @@ export default function NewPlanPage() {
 
   // Cancel pending auto-advance if the user changes their answer
   const advanceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const podMenuRef = useRef<HTMLDivElement | null>(null);
+
+  // Fetch available pods on mount
+  useEffect(() => {
+    fetch("/api/agent-context/pods")
+      .then((r) => r.json())
+      .then((data) => {
+        const podList = (data.pods ?? []) as { podName: string; title: string }[];
+        setPods(podList.map((p) => ({ podName: p.podName, title: p.title })));
+      })
+      .catch(() => {/* silently ignore if pods unavailable */});
+  }, []);
+
+  useEffect(() => {
+    function handleOutsideClick(event: MouseEvent) {
+      if (!podMenuRef.current) return;
+      if (!podMenuRef.current.contains(event.target as Node)) {
+        setIsPodMenuOpen(false);
+      }
+    }
+    function handleEscape(event: KeyboardEvent) {
+      if (event.key === "Escape") setIsPodMenuOpen(false);
+    }
+    document.addEventListener("mousedown", handleOutsideClick);
+    document.addEventListener("keydown", handleEscape);
+    return () => {
+      document.removeEventListener("mousedown", handleOutsideClick);
+      document.removeEventListener("keydown", handleEscape);
+    };
+  }, []);
+
+  useEffect(() => {
+    const availablePods = new Set(pods.map((pod) => pod.podName));
+    setSelectedPods((prev) => prev.filter((podName) => availablePods.has(podName)));
+  }, [pods]);
+
+  function togglePodSelection(podName: string) {
+    setSelectedPods((prev) =>
+      prev.includes(podName) ? prev.filter((pod) => pod !== podName) : [...prev, podName]
+    );
+  }
 
   function getAnswer(q: Question): string {
     if (q.type === "FREE_TEXT") return freeTextAnswers[q.id] ?? "";
@@ -77,7 +126,11 @@ export default function NewPlanPage() {
       const res  = await fetch("/api/ai/questions", {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({ requirement, context }),
+        body:    JSON.stringify({
+          requirement,
+          context,
+          selectedPods: selectedPods.length > 0 ? selectedPods : null,
+        }),
       });
       const data = await res.json();
       if (data.error) throw new Error(data.error);
@@ -111,7 +164,12 @@ export default function NewPlanPage() {
       const res  = await fetch("/api/ai/generate", {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({ requirement, context, answers }),
+        body:    JSON.stringify({
+          requirement,
+          context,
+          answers,
+          selectedPods: selectedPods.length > 0 ? selectedPods : null,
+        }),
       });
       const data = await res.json();
       clearInterval(interval);
@@ -224,6 +282,104 @@ export default function NewPlanPage() {
               className="w-full bg-white border border-[#cbd5e1] rounded-xl px-4 py-3 text-sm text-[#0f172a] placeholder-[#94a3b8] resize-none focus:outline-none focus:border-[#7C3AED] focus:ring-2 focus:ring-[#7C3AED]/10 transition-colors"
             />
 
+            {/* Pod selection */}
+            <div ref={podMenuRef} className="relative">
+              <label className="block text-xs font-semibold text-[#64748b] uppercase tracking-wider mb-1.5">
+                Pod <span className="font-normal normal-case text-[#94a3b8]">(optional)</span>
+              </label>
+              <button
+                type="button"
+                onClick={() => setIsPodMenuOpen((prev) => !prev)}
+                className={cn(
+                  "w-full min-h-11 bg-white border rounded-xl px-3.5 py-2 text-left text-sm transition-colors",
+                  "focus:outline-none focus:border-[#7C3AED] focus:ring-2 focus:ring-[#7C3AED]/10",
+                  isPodMenuOpen ? "border-[#7C3AED]" : "border-[#cbd5e1]"
+                )}
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    {selectedPods.length === 0 ? (
+                      <span className="text-[#94a3b8]">Not pod-specific</span>
+                    ) : (
+                      selectedPods.map((podName) => (
+                        <span
+                          key={podName}
+                          className="inline-flex items-center rounded-md bg-[#eef2ff] text-[#4f46e5] border border-[#c7d2fe] px-2 py-0.5 text-xs font-medium"
+                        >
+                          {podName}
+                        </span>
+                      ))
+                    )}
+                  </div>
+                  <svg
+                    className={cn("w-4 h-4 text-[#94a3b8] transition-transform", isPodMenuOpen && "rotate-180")}
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </div>
+              </button>
+              {isPodMenuOpen && (
+                <div className="absolute z-20 mt-2 w-full rounded-2xl border border-[#e2e8f0] bg-white shadow-[0_20px_50px_-24px_rgba(15,23,42,0.45)]">
+                  <div className="flex items-center justify-between px-3.5 py-2.5 border-b border-[#f1f5f9]">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-[#64748b]">Select pods</p>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedPods([])}
+                      disabled={selectedPods.length === 0}
+                      className="text-xs text-[#64748b] hover:text-[#0f172a] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                    >
+                      Clear
+                    </button>
+                  </div>
+                  {pods.length === 0 ? (
+                    <p className="px-3.5 py-3 text-sm text-[#94a3b8]">No pods configured yet.</p>
+                  ) : (
+                    <div className="max-h-56 overflow-auto py-1.5">
+                      {pods.map((pod) => {
+                        const isSelected = selectedPods.includes(pod.podName);
+                        return (
+                          <button
+                            key={pod.podName}
+                            type="button"
+                            onClick={() => togglePodSelection(pod.podName)}
+                            className={cn(
+                              "w-full flex items-start gap-3 px-3.5 py-2.5 text-left transition-colors",
+                              isSelected ? "bg-[#f5f3ff]" : "hover:bg-[#f8fafc]"
+                            )}
+                          >
+                            <span
+                              className={cn(
+                                "mt-0.5 h-4 w-4 rounded border flex items-center justify-center shrink-0 transition-colors",
+                                isSelected ? "bg-[#7C3AED] border-[#7C3AED]" : "border-[#cbd5e1] bg-white"
+                              )}
+                            >
+                              {isSelected && (
+                                <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                                </svg>
+                              )}
+                            </span>
+                            <span className="min-w-0">
+                              <span className="block text-sm font-medium text-[#0f172a]">{pod.podName}</span>
+                              {pod.title && pod.title !== pod.podName && (
+                                <span className="block text-xs text-[#94a3b8] mt-0.5">{pod.title}</span>
+                              )}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
+              <p className="mt-1.5 text-[11px] text-[#94a3b8]">
+                Select one or more pods to include their context in question and plan generation.
+              </p>
+            </div>
+
             <div>
               <button
                 type="button"
@@ -285,6 +441,11 @@ export default function NewPlanPage() {
                   Requirement
                 </p>
                 <p className="text-sm text-[#374151] leading-relaxed line-clamp-2">{requirement}</p>
+                {selectedPods.length > 0 && (
+                  <p className="text-[11px] text-[#7C3AED] mt-0.5 font-medium">
+                    Pods: {selectedPods.join(", ")}
+                  </p>
+                )}
               </div>
               <button
                 onClick={() => setStep("input")}

@@ -1,11 +1,21 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
 import { useAuth } from "@/components/auth-provider";
 import { cn } from "@/lib/utils";
 
-type Tab = "account" | "integrations";
+type Tab = "account" | "integrations" | "agent-context";
+
+interface AgentContextRow {
+  id: string;
+  type: "instruction" | "company" | "pod";
+  podName: string | null;
+  title: string;
+  content: string;
+  updatedBy: string | null;
+  updatedAt: string;
+}
 
 function GithubLogo({ className }: { className?: string }) {
   return (
@@ -22,6 +32,538 @@ function LinearLogo({ className }: { className?: string }) {
     </svg>
   );
 }
+
+function LockIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+    </svg>
+  );
+}
+
+function timeAgo(dateStr: string): string {
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins} minute${mins !== 1 ? "s" : ""} ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs} hour${hrs !== 1 ? "s" : ""} ago`;
+  const days = Math.floor(hrs / 24);
+  return `${days} day${days !== 1 ? "s" : ""} ago`;
+}
+
+// ── Pod Modal ────────────────────────────────────────────────────────────────
+
+interface PodModalProps {
+  initialPodName?: string;
+  initialContent?: string;
+  isEdit: boolean;
+  onSave: (podName: string, content: string) => Promise<void>;
+  onClose: () => void;
+}
+
+function PodModal({ initialPodName = "", initialContent = "", isEdit, onSave, onClose }: PodModalProps) {
+  const [podName, setPodName] = useState(initialPodName);
+  const [content, setContent] = useState(initialContent);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const [loadedFile, setLoadedFile] = useState<string | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      setContent(ev.target?.result as string ?? "");
+      setLoadedFile(file.name);
+    };
+    reader.readAsText(file);
+    e.target.value = "";
+  }
+
+  async function handleSave() {
+    if (!podName.trim() || !content.trim()) {
+      setError("Pod name and content are required.");
+      return;
+    }
+    setSaving(true);
+    setError("");
+    try {
+      await onSave(podName.trim(), content);
+      onClose();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to save pod.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl flex flex-col max-h-[90vh]">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+          <h3 className="text-base font-semibold text-slate-900">
+            {isEdit ? "Edit Pod Context" : "Add Pod Context"}
+          </h3>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 transition-colors">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4">
+          <div>
+            <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5">
+              Pod Name
+            </label>
+            <input
+              type="text"
+              value={podName}
+              onChange={(e) => setPodName(e.target.value)}
+              disabled={isEdit}
+              placeholder="e.g. Payments, Identity, Core Banking"
+              className="w-full h-10 bg-white border border-slate-200 rounded-xl px-3.5 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-500/10 transition-all disabled:bg-slate-50 disabled:text-slate-400 disabled:cursor-not-allowed"
+            />
+          </div>
+
+          <div>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider">
+                Context
+              </label>
+              <div className="flex items-center gap-2">
+                {loadedFile && (
+                  <span className="text-[11px] text-slate-400 italic">Loaded from: {loadedFile}</span>
+                )}
+                <button
+                  type="button"
+                  onClick={() => fileRef.current?.click()}
+                  className="flex items-center gap-1 text-xs text-violet-600 hover:text-violet-700 font-medium transition-colors"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                  </svg>
+                  Upload .md file
+                </button>
+                <input
+                  ref={fileRef}
+                  type="file"
+                  accept=".md,.txt"
+                  className="hidden"
+                  onChange={handleFileUpload}
+                />
+              </div>
+            </div>
+            <textarea
+              value={content}
+              onChange={(e) => setContent(e.target.value)}
+              rows={10}
+              placeholder="Describe this pod's services, conventions, infrastructure, and technical constraints..."
+              className="w-full bg-white border border-slate-200 rounded-xl px-3.5 py-3 text-sm text-slate-900 placeholder-slate-400 font-mono resize-none focus:outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-500/10 transition-all"
+            />
+          </div>
+
+          {error && (
+            <p className="text-xs text-red-500">{error}</p>
+          )}
+        </div>
+
+        <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-slate-100">
+          <button
+            onClick={onClose}
+            className="h-9 px-4 text-sm font-medium text-slate-600 hover:text-slate-900 transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={saving || !podName.trim() || !content.trim()}
+            className="flex items-center gap-2 h-9 px-5 bg-violet-600 hover:bg-violet-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium text-sm rounded-xl transition-colors shadow-sm"
+          >
+            {saving && <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
+            {saving ? "Saving…" : "Save Pod"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Delete Confirm ───────────────────────────────────────────────────────────
+
+function DeleteConfirm({ podName, onConfirm, onCancel }: { podName: string; onConfirm: () => void; onCancel: () => void }) {
+  return (
+    <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6">
+        <h3 className="text-base font-semibold text-slate-900 mb-2">Delete Pod Context</h3>
+        <p className="text-sm text-slate-500 mb-5">
+          Are you sure you want to delete the <span className="font-medium text-slate-700">{podName}</span> pod context? This cannot be undone.
+        </p>
+        <div className="flex justify-end gap-3">
+          <button onClick={onCancel} className="h-9 px-4 text-sm font-medium text-slate-600 hover:text-slate-900 transition-colors">
+            Cancel
+          </button>
+          <button
+            onClick={onConfirm}
+            className="h-9 px-5 bg-red-500 hover:bg-red-600 text-white font-medium text-sm rounded-xl transition-colors"
+          >
+            Delete
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Agent Context Tab ────────────────────────────────────────────────────────
+
+function AgentContextTab({ userEmail }: { userEmail: string }) {
+  const [contexts, setContexts] = useState<AgentContextRow[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  // Instruction
+  const [instructionContent, setInstructionContent] = useState("");
+  const [instructionSaving, setInstructionSaving] = useState(false);
+  const [instructionSaved, setInstructionSaved] = useState(false);
+  const [instructionFile, setInstructionFile] = useState<string | null>(null);
+  const instructionFileRef = useRef<HTMLInputElement>(null);
+
+  // Company
+  const [companyContent, setCompanyContent] = useState("");
+  const [companySaving, setCompanySaving] = useState(false);
+  const [companySaved, setCompanySaved] = useState(false);
+  const [companyFile, setCompanyFile] = useState<string | null>(null);
+  const companyFileRef = useRef<HTMLInputElement>(null);
+
+  // Pod modal state
+  const [podModalOpen, setPodModalOpen] = useState(false);
+  const [editingPod, setEditingPod] = useState<AgentContextRow | null>(null);
+  const [deletingPod, setDeletingPod] = useState<AgentContextRow | null>(null);
+
+  const instruction = contexts.find((c) => c.type === "instruction") ?? null;
+  const company = contexts.find((c) => c.type === "company") ?? null;
+  const pods = contexts.filter((c) => c.type === "pod");
+
+  const loadContexts = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await fetch("/api/agent-context");
+      const data = await res.json();
+      setContexts(data.contexts ?? []);
+      const inst = (data.contexts ?? []).find((c: AgentContextRow) => c.type === "instruction");
+      const comp = (data.contexts ?? []).find((c: AgentContextRow) => c.type === "company");
+      if (inst) setInstructionContent(inst.content);
+      if (comp) setCompanyContent(comp.content);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { loadContexts(); }, [loadContexts]);
+
+  async function saveInstruction() {
+    setInstructionSaving(true);
+    try {
+      await fetch("/api/agent-context/instruction", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content: instructionContent }),
+      });
+      setInstructionSaved(true);
+      setTimeout(() => setInstructionSaved(false), 2500);
+      await loadContexts();
+    } finally {
+      setInstructionSaving(false);
+    }
+  }
+
+  async function saveCompany() {
+    setCompanySaving(true);
+    try {
+      await fetch("/api/agent-context/company", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content: companyContent }),
+      });
+      setCompanySaved(true);
+      setTimeout(() => setCompanySaved(false), 2500);
+      await loadContexts();
+    } finally {
+      setCompanySaving(false);
+    }
+  }
+
+  function handleFileUpload(
+    e: React.ChangeEvent<HTMLInputElement>,
+    setContent: (v: string) => void,
+    setFileName: (v: string | null) => void
+  ) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      setContent(ev.target?.result as string ?? "");
+      setFileName(file.name);
+    };
+    reader.readAsText(file);
+    e.target.value = "";
+  }
+
+  async function handleCreatePod(podName: string, content: string) {
+    const res = await fetch("/api/agent-context/pods", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ podName, content }),
+    });
+    if (!res.ok) {
+      const data = await res.json();
+      throw new Error(data.error ?? "Failed to create pod");
+    }
+    await loadContexts();
+  }
+
+  async function handleUpdatePod(podName: string, content: string) {
+    const res = await fetch(`/api/agent-context/pods/${encodeURIComponent(podName)}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ content }),
+    });
+    if (!res.ok) {
+      const data = await res.json();
+      throw new Error(data.error ?? "Failed to update pod");
+    }
+    await loadContexts();
+  }
+
+  async function handleDeletePod(podName: string) {
+    await fetch(`/api/agent-context/pods/${encodeURIComponent(podName)}`, { method: "DELETE" });
+    setDeletingPod(null);
+    await loadContexts();
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-16">
+        <div className="w-5 h-5 border-2 border-violet-300 border-t-violet-600 rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-8">
+      {/* ── Section 1: AI Generation Instructions ── */}
+      <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
+        <h2 className="text-base font-semibold text-slate-900 mb-1">AI Generation Instructions</h2>
+        <p className="text-xs text-slate-500 mb-4 leading-relaxed">
+          This instruction is injected as the AI&apos;s system prompt for every plan. It defines output quality, format, and granularity standards.
+        </p>
+
+        {/* Toolbar */}
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => instructionFileRef.current?.click()}
+              className="flex items-center gap-1.5 text-xs font-medium text-slate-600 hover:text-slate-900 border border-slate-200 hover:border-slate-300 px-3 h-7 rounded-lg transition-all"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+              </svg>
+              Upload .md file
+            </button>
+            <input
+              ref={instructionFileRef}
+              type="file"
+              accept=".md,.txt"
+              className="hidden"
+              onChange={(e) => handleFileUpload(e, setInstructionContent, setInstructionFile)}
+            />
+            {instructionFile && (
+              <span className="text-[11px] text-slate-400 italic">Loaded from: {instructionFile}</span>
+            )}
+          </div>
+          <div className="flex items-center gap-3">
+            {instructionSaved && (
+              <span className="flex items-center gap-1 text-xs text-emerald-600 font-medium">
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                </svg>
+                Saved
+              </span>
+            )}
+            <button
+              onClick={saveInstruction}
+              disabled={instructionSaving || !instructionContent.trim()}
+              className="flex items-center gap-2 h-8 px-4 bg-violet-600 hover:bg-violet-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium text-xs rounded-xl transition-colors shadow-sm"
+            >
+              {instructionSaving && <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
+              {instructionSaving ? "Saving…" : "Save Instructions"}
+            </button>
+          </div>
+        </div>
+
+        <textarea
+          value={instructionContent}
+          onChange={(e) => setInstructionContent(e.target.value)}
+          rows={12}
+          className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-900 placeholder-slate-400 font-mono resize-y focus:outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-500/10 transition-all"
+          placeholder="Enter AI generation instructions..."
+        />
+
+        {instruction && (
+          <p className="text-[11px] text-slate-400 mt-2">
+            Updated {timeAgo(instruction.updatedAt)}{instruction.updatedBy ? ` by ${instruction.updatedBy}` : ""}
+          </p>
+        )}
+      </div>
+
+      {/* ── Section 2: Company Context ── */}
+      <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
+        <h2 className="text-base font-semibold text-slate-900 mb-1">Company Context</h2>
+        <p className="text-xs text-slate-500 mb-4 leading-relaxed">
+          Global context about the company injected into every plan. Describe your engineering org, infrastructure, conventions, and cross-service patterns.
+        </p>
+
+        {/* Toolbar */}
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => companyFileRef.current?.click()}
+              className="flex items-center gap-1.5 text-xs font-medium text-slate-600 hover:text-slate-900 border border-slate-200 hover:border-slate-300 px-3 h-7 rounded-lg transition-all"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+              </svg>
+              Upload .md file
+            </button>
+            <input
+              ref={companyFileRef}
+              type="file"
+              accept=".md,.txt"
+              className="hidden"
+              onChange={(e) => handleFileUpload(e, setCompanyContent, setCompanyFile)}
+            />
+            {companyFile && (
+              <span className="text-[11px] text-slate-400 italic">Loaded from: {companyFile}</span>
+            )}
+          </div>
+          <div className="flex items-center gap-3">
+            {companySaved && (
+              <span className="flex items-center gap-1 text-xs text-emerald-600 font-medium">
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                </svg>
+                Saved
+              </span>
+            )}
+            <button
+              onClick={saveCompany}
+              disabled={companySaving || !companyContent.trim()}
+              className="flex items-center gap-2 h-8 px-4 bg-violet-600 hover:bg-violet-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium text-xs rounded-xl transition-colors shadow-sm"
+            >
+              {companySaving && <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
+              {companySaving ? "Saving…" : "Save Company Context"}
+            </button>
+          </div>
+        </div>
+
+        <textarea
+          value={companyContent}
+          onChange={(e) => setCompanyContent(e.target.value)}
+          rows={8}
+          className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-900 placeholder-slate-400 font-mono resize-y focus:outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-500/10 transition-all"
+          placeholder={company ? "" : "Describe your engineering org, infrastructure, conventions, and cross-service patterns..."}
+        />
+
+        {company && (
+          <p className="text-[11px] text-slate-400 mt-2">
+            Updated {timeAgo(company.updatedAt)}{company.updatedBy ? ` by ${company.updatedBy}` : ""}
+          </p>
+        )}
+      </div>
+
+      {/* ── Section 3: Pod Contexts ── */}
+      <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
+        <div className="flex items-start justify-between mb-1">
+          <h2 className="text-base font-semibold text-slate-900">Pod Contexts</h2>
+          <button
+            onClick={() => { setEditingPod(null); setPodModalOpen(true); }}
+            className="flex items-center gap-1.5 h-8 px-4 bg-violet-600 hover:bg-violet-700 text-white font-medium text-xs rounded-xl transition-colors shadow-sm"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
+            </svg>
+            Add Pod Context
+          </button>
+        </div>
+        <p className="text-xs text-slate-500 mb-5 leading-relaxed">
+          Pod-specific context injected when an engineer selects a pod during plan creation. Each pod can have its own service details, conventions, and constraints.
+        </p>
+
+        {pods.length === 0 ? (
+          <div className="border border-dashed border-slate-200 rounded-xl p-8 text-center">
+            <p className="text-sm text-slate-400">No pod contexts yet. Add one to get started.</p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {pods.map((pod) => (
+              <div key={pod.id} className="border border-slate-200 rounded-xl p-4 flex items-start justify-between gap-4">
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold text-slate-900 mb-0.5">{pod.podName}</p>
+                  <p className="text-xs text-slate-500 line-clamp-2 leading-relaxed">
+                    {pod.content.slice(0, 120)}{pod.content.length > 120 ? "…" : ""}
+                  </p>
+                  <p className="text-[11px] text-slate-400 mt-1.5">
+                    Updated {timeAgo(pod.updatedAt)}{pod.updatedBy ? ` by ${pod.updatedBy}` : ""}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    onClick={() => { setEditingPod(pod); setPodModalOpen(true); }}
+                    className="h-7 px-3 text-xs font-medium text-slate-600 hover:text-slate-900 border border-slate-200 hover:border-slate-300 rounded-lg transition-all"
+                  >
+                    Edit
+                  </button>
+                  <button
+                    onClick={() => setDeletingPod(pod)}
+                    className="h-7 px-3 text-xs font-medium text-red-500 hover:text-red-700 border border-red-200 hover:border-red-300 rounded-lg transition-all"
+                  >
+                    Delete
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Pod Add/Edit Modal */}
+      {podModalOpen && (
+        <PodModal
+          isEdit={!!editingPod}
+          initialPodName={editingPod?.podName ?? ""}
+          initialContent={editingPod?.content ?? ""}
+          onSave={editingPod ? (_, content) => handleUpdatePod(editingPod.podName!, content) : handleCreatePod}
+          onClose={() => { setPodModalOpen(false); setEditingPod(null); }}
+        />
+      )}
+
+      {/* Delete Confirmation */}
+      {deletingPod && (
+        <DeleteConfirm
+          podName={deletingPod.podName!}
+          onConfirm={() => handleDeletePod(deletingPod.podName!)}
+          onCancel={() => setDeletingPod(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+// ── Main Settings Page ───────────────────────────────────────────────────────
 
 export default function SettingsPage() {
   const { user } = useAuth();
@@ -57,9 +599,10 @@ export default function SettingsPage() {
     }
   }
 
-  const tabs: { id: Tab; label: string }[] = [
+  const tabs: { id: Tab; label: string; adminOnly?: boolean }[] = [
     { id: "account", label: "Account" },
     { id: "integrations", label: "Integrations" },
+    ...(user?.agentContextEnabled ? [{ id: "agent-context" as Tab, label: "Agent Context", adminOnly: true }] : []),
   ];
 
   return (
@@ -76,12 +619,13 @@ export default function SettingsPage() {
             key={t.id}
             onClick={() => setTab(t.id)}
             className={cn(
-              "px-4 py-2.5 text-sm font-medium transition-all border-b-2 -mb-px",
+              "flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium transition-all border-b-2 -mb-px",
               tab === t.id
                 ? "border-violet-600 text-violet-700"
                 : "border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300"
             )}
           >
+            {t.adminOnly && <LockIcon className="w-3 h-3" />}
             {t.label}
           </button>
         ))}
@@ -236,6 +780,11 @@ export default function SettingsPage() {
             </Link>
           </div>
         </div>
+      )}
+
+      {/* ── Agent Context Tab ── */}
+      {tab === "agent-context" && user?.agentContextEnabled && (
+        <AgentContextTab userEmail={user.email} />
       )}
     </div>
   );

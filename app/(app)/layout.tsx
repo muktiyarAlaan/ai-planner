@@ -23,6 +23,7 @@ export default async function AppLayout({
     hasLinearToken: session.hasLinearToken,
     hasGithubToken: session.hasGithubToken,
     githubRepos: session.githubRepos,
+    agentContextEnabled: session.agentContextEnabled,
   };
 
   return (

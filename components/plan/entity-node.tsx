@@ -47,18 +47,28 @@ function getTypeTheme(type: string): TypeTheme {
 // Not wrapped in memo — ensures real-time drawer edits reflect immediately on canvas
 export function EntityNode({ data, selected }: NodeProps<EntityNodeData>) {
   const [expanded, setExpanded] = useState(false);
+  const [hovered,  setHovered]  = useState(false);
   const fields   = data.fields ?? [];
   const visible  = expanded ? fields : fields.slice(0, MAX_FIELDS);
   const hiddenCt = Math.max(0, fields.length - MAX_FIELDS);
 
+  // Handles are faint at rest, fully visible on hover/select — reduces clutter
+  // on dense canvases while remaining discoverable and always interactive.
+  const handleOpacity  = hovered || selected ? 1 : 0.22;
+  const handleTransition = "opacity 0.18s ease";
+
   return (
     <div
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
       style={{
         background:    "white",
         borderRadius:  12,
         border:        selected ? "1.5px solid #4338ca" : "1.5px solid #e2e8f0",
         boxShadow:     selected
           ? "0 0 0 4px rgba(67,56,202,0.13), 0 8px 28px rgba(67,56,202,0.18)"
+          : hovered
+          ? "0 4px 16px rgba(0,0,0,0.10), 0 1px 3px rgba(0,0,0,0.06)"
           : "0 2px 10px rgba(0,0,0,0.07), 0 1px 2px rgba(0,0,0,0.04)",
         minWidth:  236,
         maxWidth:  300,
@@ -70,16 +80,20 @@ export function EntityNode({ data, selected }: NodeProps<EntityNodeData>) {
       {/* ── Connection handles ────────────────────────────────────────────── */}
       <Handle type="target"   position={Position.Top}
         style={{ background:"#4338ca", border:"2.5px solid white", width:14, height:14, top:-7,
-                 boxShadow:"0 0 0 3px rgba(67,56,202,0.2)", cursor:"crosshair", zIndex:20 }} />
+                 boxShadow:"0 0 0 3px rgba(67,56,202,0.2)", cursor:"crosshair", zIndex:20,
+                 opacity: handleOpacity, transition: handleTransition }} />
       <Handle type="source"   position={Position.Bottom}
         style={{ background:"#4338ca", border:"2.5px solid white", width:14, height:14, bottom:-7,
-                 boxShadow:"0 0 0 3px rgba(67,56,202,0.2)", cursor:"crosshair", zIndex:20 }} />
+                 boxShadow:"0 0 0 3px rgba(67,56,202,0.2)", cursor:"crosshair", zIndex:20,
+                 opacity: handleOpacity, transition: handleTransition }} />
       <Handle type="source"   position={Position.Right} id="right"
         style={{ background:"#818cf8", border:"2px solid white", width:10, height:10, right:-5,
-                 boxShadow:"0 0 0 2px rgba(129,140,248,0.25)", cursor:"crosshair", zIndex:20 }} />
+                 boxShadow:"0 0 0 2px rgba(129,140,248,0.25)", cursor:"crosshair", zIndex:20,
+                 opacity: handleOpacity, transition: handleTransition }} />
       <Handle type="target"   position={Position.Left}  id="left"
         style={{ background:"#818cf8", border:"2px solid white", width:10, height:10, left:-5,
-                 boxShadow:"0 0 0 2px rgba(129,140,248,0.25)", cursor:"crosshair", zIndex:20 }} />
+                 boxShadow:"0 0 0 2px rgba(129,140,248,0.25)", cursor:"crosshair", zIndex:20,
+                 opacity: handleOpacity, transition: handleTransition }} />
 
       {/* ── Header ───────────────────────────────────────────────────────── */}
       <div

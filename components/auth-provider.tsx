@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useContext, useEffect, useState } from "react";
-import { signOut as firebaseSignOut } from "firebase/auth";
+import { signOut as firebaseSignOut, onAuthStateChanged } from "firebase/auth";
 import { useRouter } from "next/navigation";
 import { auth } from "@/lib/firebase";
 
@@ -14,6 +14,7 @@ export interface AuthUser {
   hasLinearToken: boolean;
   hasGithubToken: boolean;
   githubRepos: { fullName: string; owner: string; repo: string }[] | null;
+  agentContextEnabled: boolean;
 }
 
 interface AuthContextValue {
@@ -42,6 +43,19 @@ export function AuthProvider({ user, children }: Props) {
   useEffect(() => {
     setCurrentUser(user);
   }, [user]);
+
+  // If the DB image is null, pull the photo URL directly from Firebase client state
+  // so the avatar shows immediately without requiring a re-login.
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+      if (firebaseUser?.photoURL) {
+        setCurrentUser((prev) =>
+          prev ? { ...prev, image: prev.image || firebaseUser.photoURL } : prev
+        );
+      }
+    });
+    return unsubscribe;
+  }, []);
 
   const signOut = async () => {
     await firebaseSignOut(auth);

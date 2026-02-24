@@ -14,6 +14,7 @@ import { LinearTab } from "./linear-tab";
 import { AiChatPanel } from "./ai-chat-panel";
 import { SecurityTab } from "./security-tab";
 import { ShareModal } from "./share-modal";
+import { autoLayoutEntities } from "@/lib/erd-layout";
 
 type Tab = "Requirements" | "Entities" | "User Flows" | "APIs" | "Security" | "Context" | "Linear";
 const TABS: Tab[] = ["Requirements", "Entities", "User Flows", "APIs", "Security", "Context", "Linear"];
@@ -25,21 +26,11 @@ const CHAT_DEFAULT = 340;
 // All sections the AI can patch in one response
 export interface PlanPatch {
   entities?:      PlanData["entities"];
+  userFlows?:     PlanData["userFlows"];
   requirements?:  PlanData["requirements"];
   apiEndpoints?:  PlanData["apiEndpoints"];
   contextMd?:     PlanData["contextMd"];
   linearTickets?: PlanData["linearTickets"];
-}
-
-// Map a patch to human-readable tab names for the banner
-function patchedSections(patch: PlanPatch): string {
-  const names: string[] = [];
-  if (patch.entities)      names.push("Entities");
-  if (patch.requirements)  names.push("Requirements");
-  if (patch.apiEndpoints)  names.push("APIs");
-  if (patch.contextMd)     names.push("Context");
-  if (patch.linearTickets) names.push("Linear Tickets");
-  return names.join(", ");
 }
 
 interface Props {
@@ -59,11 +50,22 @@ function formatRelTime(dateStr: string): string {
   return new Date(dateStr).toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
+const CHAT_OPEN_KEY = "ai-panel-open";
+
 export function PlanView({ plan, user }: Props) {
   const [activeTab, setActiveTab] = useState<Tab>("Requirements");
-  const [chatOpen,  setChatOpen]  = useState(true);
+  const [chatOpen,  setChatOpen]  = useState(() => {
+    if (typeof window === "undefined") return true;
+    const stored = localStorage.getItem(CHAT_OPEN_KEY);
+    return stored === null ? true : stored === "1";
+  });
   const [chatWidth, setChatWidth] = useState(CHAT_DEFAULT);
   const [shareOpen, setShareOpen] = useState(false);
+
+  // Persist chat panel open/closed state
+  useEffect(() => {
+    localStorage.setItem(CHAT_OPEN_KEY, chatOpen ? "1" : "0");
+  }, [chatOpen]);
 
   // ── Local plan state — AI patches are merged here ────────────────────────
   const [planData, setPlanData] = useState<PlanData>(plan);
@@ -99,30 +101,53 @@ export function PlanView({ plan, user }: Props) {
 
   // Version keys — incrementing forces a tab to remount with fresh initialProp
   const [entitiesKey,  setEntitiesKey]  = useState(0);
+  const [userFlowsKey, setUserFlowsKey] = useState(0);
   const [contextKey,   setContextKey]   = useState(0);
   const [linearKey,    setLinearKey]    = useState(0);
+  const [apiKey,       setApiKey]       = useState(0);
 
   // "Updated" indicator shown in the tab strip after an AI patch
   const [updatedTabs, setUpdatedTabs] = useState<Set<Tab>>(new Set());
 
   // Called by AiChatPanel whenever the API returns a non-null patch
   const onPlanUpdate = useCallback((patch: PlanPatch) => {
-    setPlanData((prev) => ({ ...prev, ...patch }));
+    let normalizedPatch = patch;
+    if (patch.entities?.nodes?.length) {
+      normalizedPatch = {
+        ...patch,
+        entities: {
+          ...patch.entities,
+          nodes: autoLayoutEntities(
+            patch.entities.nodes as unknown as import("reactflow").Node[],
+            (patch.entities.edges ?? []) as unknown as import("reactflow").Edge[],
+          ) as unknown as NonNullable<PlanData["entities"]>["nodes"],
+        },
+      };
+    }
+
+    setPlanData((prev) => ({ ...prev, ...normalizedPatch }));
 
     // Force remount on canvas tabs so they pick up fresh data
-    if (patch.entities)      setEntitiesKey((k)  => k + 1);
-    if (patch.contextMd)     setContextKey((k)   => k + 1);
-    if (patch.linearTickets) setLinearKey((k)    => k + 1);
+    if (normalizedPatch.entities)      setEntitiesKey((k)  => k + 1);
+    if (normalizedPatch.userFlows)     setUserFlowsKey((k) => k + 1);
+    if (normalizedPatch.contextMd)     setContextKey((k)   => k + 1);
+    if (normalizedPatch.linearTickets) setLinearKey((k)    => k + 1);
+    if (normalizedPatch.apiEndpoints)  setApiKey((k)       => k + 1);
 
     // Light up the affected tabs with a green dot for 4 s
     const affected = new Set<Tab>();
-    if (patch.requirements)  affected.add("Requirements");
-    if (patch.entities)      affected.add("Entities");
-    if (patch.apiEndpoints)  affected.add("APIs");
-    if (patch.contextMd)     affected.add("Context");
-    if (patch.linearTickets) affected.add("Linear");
+    if (normalizedPatch.requirements)  affected.add("Requirements");
+    if (normalizedPatch.entities)      affected.add("Entities");
+    if (normalizedPatch.userFlows)     affected.add("User Flows");
+    if (normalizedPatch.apiEndpoints)  affected.add("APIs");
+    if (normalizedPatch.contextMd)     affected.add("Context");
+    if (normalizedPatch.linearTickets) affected.add("Linear");
     setUpdatedTabs(affected);
     setTimeout(() => setUpdatedTabs(new Set()), 4000);
+  }, []);
+
+  const onEntitiesUpdate = useCallback((updatedEntities: PlanData["entities"]) => {
+    setPlanData((prev) => ({ ...prev, entities: updatedEntities }));
   }, []);
 
   // ── Drag-to-resize chat panel ─────────────────────────────────────────────
@@ -315,10 +340,16 @@ export function PlanView({ plan, user }: Props) {
             />
           )}
           {activeTab === "Entities" && (
-            <EntitiesTab key={entitiesKey} entities={planData.entities} />
+            <EntitiesTab
+              key={entitiesKey}
+              entities={planData.entities}
+              planId={planData.id}
+              onUpdate={onEntitiesUpdate}
+            />
           )}
           {activeTab === "User Flows" && (
             <UserFlowsTab
+              key={userFlowsKey}
               userFlows={planData.userFlows}
               planId={planData.id}
               onUpdate={(flows) => setPlanData((prev) => ({ ...prev, userFlows: flows }))}
@@ -326,6 +357,7 @@ export function PlanView({ plan, user }: Props) {
           )}
           {activeTab === "APIs" && (
             <ApiTab
+              key={apiKey}
               apiEndpoints={planData.apiEndpoints}
               planId={planData.id}
               onUpdate={(eps) => setPlanData((prev) => ({ ...prev, apiEndpoints: eps }))}

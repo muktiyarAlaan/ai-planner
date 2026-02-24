@@ -81,7 +81,14 @@ function EndpointEditForm({
   onDelete?: () => void;
   isNew?: boolean;
 }) {
-  const [ep,          setEp]          = useState<ApiEndpoint>({ ...initial });
+  const [ep,          setEp]          = useState<ApiEndpoint>({
+    method:       (initial.method       || "GET")  as ApiEndpoint["method"],
+    path:         initial.path          || "",
+    description:  initial.description  || "",
+    auth:         initial.auth          ?? false,
+    requestBody:  initial.requestBody   ?? null,
+    responseBody: initial.responseBody  ?? null,
+  });
   const [reqBodyText, setReqBodyText] = useState(initial.requestBody ? JSON.stringify(initial.requestBody, null, 2) : "");
   const [resBodyText, setResBodyText] = useState(initial.responseBody ? JSON.stringify(initial.responseBody, null, 2) : "");
   const [reqError,    setReqError]    = useState("");
@@ -109,7 +116,7 @@ function EndpointEditForm({
           <select
             value={ep.method}
             onChange={(e) => setEp({ ...ep, method: e.target.value as ApiEndpoint["method"] })}
-            className="w-full text-[12px] font-mono font-semibold bg-[#f8fafc] border border-[#e2e8f0] rounded-lg px-2 py-1.5 focus:outline-none focus:border-[#7C3AED] transition-colors"
+            className="w-full text-[12px] text-[#0f172a] font-mono font-semibold bg-[#f8fafc] border border-[#e2e8f0] rounded-lg px-2 py-1.5 focus:outline-none focus:border-[#7C3AED] transition-colors"
           >
             {HTTP_METHODS.map((m) => <option key={m} value={m}>{m}</option>)}
           </select>
@@ -120,7 +127,7 @@ function EndpointEditForm({
             value={ep.path}
             onChange={(e) => setEp({ ...ep, path: e.target.value })}
             placeholder="/api/resource"
-            className="w-full text-[12px] font-mono bg-[#f8fafc] border border-[#e2e8f0] rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-[#7C3AED] transition-colors"
+            className="w-full text-[12px] text-[#0f172a] font-mono bg-[#f8fafc] border border-[#e2e8f0] rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-[#7C3AED] transition-colors"
           />
         </div>
       </div>
@@ -155,7 +162,7 @@ function EndpointEditForm({
           onChange={(e) => { setReqBodyText(e.target.value); setReqError(""); }}
           rows={3}
           placeholder='{"key": "value"}'
-          className={cn("w-full text-[11.5px] font-mono bg-[#f8fafc] border rounded-lg px-2.5 py-2 resize-y focus:outline-none transition-colors",
+          className={cn("w-full text-[11.5px] text-[#0f172a] font-mono bg-[#f8fafc] border rounded-lg px-2.5 py-2 resize-y focus:outline-none transition-colors",
             reqError ? "border-red-400" : "border-[#e2e8f0] focus:border-[#7C3AED]")}
         />
         {reqError && <p className="text-[10px] text-red-500 mt-0.5">{reqError}</p>}
@@ -168,7 +175,7 @@ function EndpointEditForm({
           onChange={(e) => { setResBodyText(e.target.value); setResError(""); }}
           rows={3}
           placeholder='{"id": "uuid", ...}'
-          className={cn("w-full text-[11.5px] font-mono bg-[#f8fafc] border rounded-lg px-2.5 py-2 resize-y focus:outline-none transition-colors",
+          className={cn("w-full text-[11.5px] text-[#0f172a] font-mono bg-[#f8fafc] border rounded-lg px-2.5 py-2 resize-y focus:outline-none transition-colors",
             resError ? "border-red-400" : "border-[#e2e8f0] focus:border-[#7C3AED]")}
         />
         {resError && <p className="text-[10px] text-red-500 mt-0.5">{resError}</p>}
@@ -490,7 +497,7 @@ export function ApiTab({ apiEndpoints, planId, onUpdate }: Props) {
         ) : (
           filtered.map((ep, i) => (
             <EndpointCard
-              key={i}
+              key={`${ep.method}-${ep.path}-${i}`}
               endpoint={ep}
               onSave={(updated) => handleSave(updated, ep)}
               onDelete={() => handleDelete(ep)}

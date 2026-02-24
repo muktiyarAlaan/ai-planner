@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/get-session";
 import { getGeminiModel } from "@/lib/gemini";
+import { AgentContext } from "@/models/AgentContext";
+import { sequelize } from "@/lib/sequelize";
+import { Op } from "sequelize";
 
 export async function POST(req: Request) {
   const session = await getSession();
@@ -9,18 +12,65 @@ export async function POST(req: Request) {
   }
 
   const body = await req.json();
-  const { requirement, context } = body as { requirement: string; context?: string };
+  const { requirement, context, selectedPod, selectedPods } = body as {
+    requirement: string;
+    context?: string;
+    selectedPod?: string | null;
+    selectedPods?: string[] | null;
+  };
 
   if (!requirement?.trim()) {
     return NextResponse.json({ error: "Requirement is required" }, { status: 400 });
   }
 
   try {
-    const model = getGeminiModel();
+    const normalizedSelectedPods = Array.from(
+      new Set(
+        (selectedPods && selectedPods.length > 0
+          ? selectedPods
+          : selectedPod
+          ? [selectedPod]
+          : []
+        )
+          .map((podName) => podName?.trim())
+          .filter((podName): podName is string => Boolean(podName))
+      )
+    );
 
-    const prompt = `You are a senior software architect helping an engineering team plan a new feature.
+    // Fetch agent contexts from DB
+    await sequelize.authenticate();
+    const [instructionRow, companyRow, podRows] = await Promise.all([
+      AgentContext.findOne({ where: { type: "instruction" } }),
+      AgentContext.findOne({ where: { type: "company" } }),
+      normalizedSelectedPods.length > 0
+        ? AgentContext.findAll({
+            where: { type: "pod", podName: { [Op.in]: normalizedSelectedPods } },
+          })
+        : Promise.resolve(null),
+    ]);
 
-A developer has submitted this requirement:
+    const systemInstruction = instructionRow?.content ?? undefined;
+
+    const companyContext = companyRow?.content ?? null;
+    const podContextByName = new Map((podRows ?? []).map((podRow) => [podRow.podName, podRow.content]));
+    const podContextBlocks = normalizedSelectedPods
+      .map((podName) => {
+        const podContext = podContextByName.get(podName);
+        if (!podContext) return "";
+        return `## Pod Context (${podName})\n${podContext}`;
+      })
+      .filter(Boolean);
+
+    const model = getGeminiModel("gemini-3-pro-preview", systemInstruction);
+
+    const contextBlock = [
+      companyContext ? `## Company Context\n${companyContext}` : "",
+      ...podContextBlocks,
+    ]
+      .filter(Boolean)
+      .join("\n\n");
+
+    const prompt = `${contextBlock ? `${contextBlock}\n\n` : ""}A developer has submitted this requirement:
 "${requirement}"
 
 ${context ? `Additional context provided:\n${context}\n` : ""}

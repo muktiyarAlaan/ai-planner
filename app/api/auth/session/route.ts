@@ -44,8 +44,10 @@ export async function POST(request: NextRequest) {
       defaults: { email, name, image: picture },
     });
 
-    if (dbUser.name !== name || dbUser.image !== picture) {
-      await dbUser.update({ name, image: picture });
+    // Only overwrite image if Firebase actually returned one — never null-out an existing photo
+    const imageToStore = picture ?? dbUser.image;
+    if (dbUser.name !== name || (picture && dbUser.image !== picture)) {
+      await dbUser.update({ name, image: imageToStore });
     }
 
     // Create our own signed session JWT

@@ -55,6 +55,11 @@ export class User extends Model {
   @Column(DataType.JSONB)
   declare githubRepos: { fullName: string; owner: string; repo: string }[] | null;
 
+  @Default(false)
+  @AllowNull(false)
+  @Column(DataType.BOOLEAN)
+  declare agentContextEnabled: boolean;
+
   @CreatedAt
   declare createdAt: Date;
 

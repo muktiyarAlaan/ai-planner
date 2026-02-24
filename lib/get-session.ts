@@ -15,6 +15,7 @@ export interface SessionUser {
   linearAccessToken: string | null;
   hasGithubToken: boolean;
   githubRepos: { fullName: string; owner: string; repo: string }[] | null;
+  agentContextEnabled: boolean;
 }
 
 const secret = new TextEncoder().encode(process.env.SESSION_SECRET!);
@@ -33,7 +34,7 @@ export async function getSession(): Promise<SessionUser | null> {
     await sequelize.authenticate();
     const user = await User.findOne({
       where: { id: userId },
-      attributes: ["id", "email", "name", "image", "claudeApiKey", "linearAccessToken", "githubAccessToken", "githubRepos"],
+      attributes: ["id", "email", "name", "image", "claudeApiKey", "linearAccessToken", "githubAccessToken", "githubRepos", "agentContextEnabled"],
     });
 
     if (!user) return null;
@@ -58,6 +59,7 @@ export async function getSession(): Promise<SessionUser | null> {
       linearAccessToken,
       hasGithubToken: !!user.githubAccessToken,
       githubRepos: user.githubRepos ?? null,
+      agentContextEnabled: user.agentContextEnabled ?? false,
     };
   } catch {
     return null;

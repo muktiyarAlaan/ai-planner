@@ -8,6 +8,9 @@ export function getGeminiClient(): GoogleGenerativeAI {
   return new GoogleGenerativeAI(apiKey);
 }
 
-export function getGeminiModel(modelName = "gemini-3-pro-preview") {
-  return getGeminiClient().getGenerativeModel({ model: modelName });
+export function getGeminiModel(modelName = "gemini-3-pro-preview", systemInstruction?: string) {
+  return getGeminiClient().getGenerativeModel({
+    model: modelName,
+    ...(systemInstruction ? { systemInstruction } : {}),
+  });
 }
