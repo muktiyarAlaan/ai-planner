@@ -178,7 +178,7 @@ function ROEndpointCard({ endpoint }: { endpoint: ApiEndpoint }) {
 }
 
 function ReadOnlyApis({ apiEndpoints }: { apiEndpoints: ApiEndpoint[] | null }) {
-  const endpoints = apiEndpoints ?? [];
+  const endpoints = useMemo(() => apiEndpoints ?? [], [apiEndpoints]);
   const [search,       setSearch]       = useState("");
   const [methodFilter, setMethodFilter] = useState<string | null>(null);
 

@@ -89,7 +89,7 @@ export function UserFlowsTab({ userFlows, planId, onUpdate, readOnly = false }: 
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Debounced auto-save
-  function persistFlows(updatedNodes: Node[], updatedEdges: Edge[]) {
+  const persistFlows = useCallback((updatedNodes: Node[], updatedEdges: Edge[]) => {
     if (readOnly) return;
     if (saveTimer.current) clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(async () => {
@@ -103,7 +103,7 @@ export function UserFlowsTab({ userFlows, planId, onUpdate, readOnly = false }: 
         });
       } catch { /* silent */ }
     }, 1000);
-  }
+  }, [readOnly, onUpdate, planId]);
 
   const onNodesChange = useCallback(
     (changes: NodeChange[]) =>
@@ -112,7 +112,7 @@ export function UserFlowsTab({ userFlows, planId, onUpdate, readOnly = false }: 
         persistFlows(updated, edges);
         return updated;
       }),
-    [edges]
+    [edges, persistFlows]
   );
 
   const onEdgesChange = useCallback(
@@ -122,7 +122,7 @@ export function UserFlowsTab({ userFlows, planId, onUpdate, readOnly = false }: 
         persistFlows(nodes, updated);
         return updated;
       }),
-    [nodes]
+    [nodes, persistFlows]
   );
 
   const onConnect = useCallback(
@@ -137,7 +137,7 @@ export function UserFlowsTab({ userFlows, planId, onUpdate, readOnly = false }: 
         persistFlows(nodes, updated);
         return updated;
       }),
-    [nodes]
+    [nodes, persistFlows]
   );
 
   // Double-click node → edit label (edit mode only)
