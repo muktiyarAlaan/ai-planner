@@ -90,6 +90,7 @@ export function UserFlowsTab({ userFlows, planId, onUpdate, readOnly = false }: 
 
   // Debounced auto-save
   function persistFlows(updatedNodes: Node[], updatedEdges: Edge[]) {
+    if (readOnly) return;
     if (saveTimer.current) clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(async () => {
       const flows = { nodes: updatedNodes as RFNode[], edges: updatedEdges as RFEdge[] };
@@ -139,20 +140,22 @@ export function UserFlowsTab({ userFlows, planId, onUpdate, readOnly = false }: 
     [nodes]
   );
 
-  // Double-click node → edit label
+  // Double-click node → edit label (edit mode only)
   const onNodeDoubleClick = useCallback((_: React.MouseEvent, node: Node) => {
+    if (readOnly) return;
     setSelectedNode(node);
     setLabelDraft((node.data as FlowNodeData).label ?? "");
     setEditingLabel(true);
     setShowTypeMenu(false);
-  }, []);
+  }, [readOnly]);
 
-  // Single click → select
+  // Single click → select (edit mode only)
   const onNodeClick = useCallback((_: React.MouseEvent, node: Node) => {
+    if (readOnly) return;
     setSelectedNode(node);
     setEditingLabel(false);
     setShowTypeMenu(false);
-  }, []);
+  }, [readOnly]);
 
   function saveLabel() {
     if (!selectedNode) return;
@@ -281,11 +284,14 @@ export function UserFlowsTab({ userFlows, planId, onUpdate, readOnly = false }: 
           edges={edges}
           onNodesChange={onNodesChange}
           onEdgesChange={onEdgesChange}
-          onConnect={onConnect}
+          onConnect={readOnly ? undefined : onConnect}
           nodeTypes={nodeTypes}
           onNodeClick={onNodeClick}
           onNodeDoubleClick={onNodeDoubleClick}
           onPaneClick={() => { setSelectedNode(null); setEditingLabel(false); setShowTypeMenu(false); }}
+          nodesDraggable={!readOnly}
+          nodesConnectable={!readOnly}
+          elementsSelectable={!readOnly}
           fitView
           proOptions={{ hideAttribution: true }}
         >

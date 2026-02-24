@@ -60,12 +60,26 @@ const CREATE_ISSUE = `
 `;
 
 function buildDescription(ticket: LinearTicket): string {
-  let md = ticket.description ?? "";
-  if (ticket.acceptanceCriteria?.length) {
-    md += "\n\n## Acceptance Criteria\n";
-    md += ticket.acceptanceCriteria.map((ac) => `- [ ] ${ac}`).join("\n");
+  const parts: string[] = [];
+
+  if (ticket.description?.trim()) {
+    parts.push(ticket.description.trim());
   }
-  return md.trim();
+
+  // Only append AC if the rich description doesn't already embed them
+  const descriptionHasAC = ticket.description?.includes("## Acceptance Criteria");
+  if (!descriptionHasAC && ticket.acceptanceCriteria?.length) {
+    parts.push("## Acceptance Criteria\n" + ticket.acceptanceCriteria.map((ac) => `- [ ] ${ac}`).join("\n"));
+  }
+
+  if (ticket.children?.length) {
+    const childList = ticket.children
+      .map((c) => `- **${c.type}**: ${c.title}`)
+      .join("\n");
+    parts.push(`## Sub-issues\n${childList}`);
+  }
+
+  return parts.join("\n\n").trim();
 }
 
 interface IssueCreated { id: string; identifier: string; url: string; }

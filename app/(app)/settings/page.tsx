@@ -219,7 +219,7 @@ function DeleteConfirm({ podName, onConfirm, onCancel }: { podName: string; onCo
 
 // ── Agent Context Tab ────────────────────────────────────────────────────────
 
-function AgentContextTab({ userEmail }: { userEmail: string }) {
+function AgentContextTab({ userEmail, canEdit }: { userEmail: string; canEdit: boolean }) {
   const [contexts, setContexts] = useState<AgentContextRow[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -355,60 +355,73 @@ function AgentContextTab({ userEmail }: { userEmail: string }) {
     <div className="space-y-8">
       {/* ── Section 1: AI Generation Instructions ── */}
       <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
-        <h2 className="text-base font-semibold text-slate-900 mb-1">AI Generation Instructions</h2>
+        <div className="flex items-center gap-2 mb-1">
+          <h2 className="text-base font-semibold text-slate-900">AI Generation Instructions</h2>
+          {!canEdit && (
+            <span className="text-[10px] font-semibold text-slate-400 bg-slate-100 border border-slate-200 px-1.5 py-0.5 rounded-md">Read-only</span>
+          )}
+        </div>
         <p className="text-xs text-slate-500 mb-4 leading-relaxed">
           This instruction is injected as the AI&apos;s system prompt for every plan. It defines output quality, format, and granularity standards.
         </p>
 
-        {/* Toolbar */}
-        <div className="flex items-center justify-between mb-2">
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => instructionFileRef.current?.click()}
-              className="flex items-center gap-1.5 text-xs font-medium text-slate-600 hover:text-slate-900 border border-slate-200 hover:border-slate-300 px-3 h-7 rounded-lg transition-all"
-            >
-              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-              </svg>
-              Upload .md file
-            </button>
-            <input
-              ref={instructionFileRef}
-              type="file"
-              accept=".md,.txt"
-              className="hidden"
-              onChange={(e) => handleFileUpload(e, setInstructionContent, setInstructionFile)}
-            />
-            {instructionFile && (
-              <span className="text-[11px] text-slate-400 italic">Loaded from: {instructionFile}</span>
-            )}
-          </div>
-          <div className="flex items-center gap-3">
-            {instructionSaved && (
-              <span className="flex items-center gap-1 text-xs text-emerald-600 font-medium">
+        {/* Toolbar — edit mode only */}
+        {canEdit && (
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => instructionFileRef.current?.click()}
+                className="flex items-center gap-1.5 text-xs font-medium text-slate-600 hover:text-slate-900 border border-slate-200 hover:border-slate-300 px-3 h-7 rounded-lg transition-all"
+              >
                 <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
                 </svg>
-                Saved
-              </span>
-            )}
-            <button
-              onClick={saveInstruction}
-              disabled={instructionSaving || !instructionContent.trim()}
-              className="flex items-center gap-2 h-8 px-4 bg-violet-600 hover:bg-violet-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium text-xs rounded-xl transition-colors shadow-sm"
-            >
-              {instructionSaving && <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
-              {instructionSaving ? "Saving…" : "Save Instructions"}
-            </button>
+                Upload .md file
+              </button>
+              <input
+                ref={instructionFileRef}
+                type="file"
+                accept=".md,.txt"
+                className="hidden"
+                onChange={(e) => handleFileUpload(e, setInstructionContent, setInstructionFile)}
+              />
+              {instructionFile && (
+                <span className="text-[11px] text-slate-400 italic">Loaded from: {instructionFile}</span>
+              )}
+            </div>
+            <div className="flex items-center gap-3">
+              {instructionSaved && (
+                <span className="flex items-center gap-1 text-xs text-emerald-600 font-medium">
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                  </svg>
+                  Saved
+                </span>
+              )}
+              <button
+                onClick={saveInstruction}
+                disabled={instructionSaving || !instructionContent.trim()}
+                className="flex items-center gap-2 h-8 px-4 bg-violet-600 hover:bg-violet-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium text-xs rounded-xl transition-colors shadow-sm"
+              >
+                {instructionSaving && <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
+                {instructionSaving ? "Saving…" : "Save Instructions"}
+              </button>
+            </div>
           </div>
-        </div>
+        )}
 
         <textarea
           value={instructionContent}
-          onChange={(e) => setInstructionContent(e.target.value)}
+          onChange={(e) => canEdit && setInstructionContent(e.target.value)}
+          readOnly={!canEdit}
           rows={12}
-          className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-900 placeholder-slate-400 font-mono resize-y focus:outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-500/10 transition-all"
+          className={cn(
+            "w-full border border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-900 placeholder-slate-400 font-mono transition-all",
+            canEdit
+              ? "bg-slate-50 resize-y focus:outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-500/10"
+              : "bg-slate-50/50 resize-none cursor-default text-slate-600"
+          )}
           placeholder="Enter AI generation instructions..."
         />
 
@@ -421,60 +434,73 @@ function AgentContextTab({ userEmail }: { userEmail: string }) {
 
       {/* ── Section 2: Company Context ── */}
       <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
-        <h2 className="text-base font-semibold text-slate-900 mb-1">Company Context</h2>
+        <div className="flex items-center gap-2 mb-1">
+          <h2 className="text-base font-semibold text-slate-900">Company Context</h2>
+          {!canEdit && (
+            <span className="text-[10px] font-semibold text-slate-400 bg-slate-100 border border-slate-200 px-1.5 py-0.5 rounded-md">Read-only</span>
+          )}
+        </div>
         <p className="text-xs text-slate-500 mb-4 leading-relaxed">
           Global context about the company injected into every plan. Describe your engineering org, infrastructure, conventions, and cross-service patterns.
         </p>
 
-        {/* Toolbar */}
-        <div className="flex items-center justify-between mb-2">
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => companyFileRef.current?.click()}
-              className="flex items-center gap-1.5 text-xs font-medium text-slate-600 hover:text-slate-900 border border-slate-200 hover:border-slate-300 px-3 h-7 rounded-lg transition-all"
-            >
-              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-              </svg>
-              Upload .md file
-            </button>
-            <input
-              ref={companyFileRef}
-              type="file"
-              accept=".md,.txt"
-              className="hidden"
-              onChange={(e) => handleFileUpload(e, setCompanyContent, setCompanyFile)}
-            />
-            {companyFile && (
-              <span className="text-[11px] text-slate-400 italic">Loaded from: {companyFile}</span>
-            )}
-          </div>
-          <div className="flex items-center gap-3">
-            {companySaved && (
-              <span className="flex items-center gap-1 text-xs text-emerald-600 font-medium">
+        {/* Toolbar — edit mode only */}
+        {canEdit && (
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => companyFileRef.current?.click()}
+                className="flex items-center gap-1.5 text-xs font-medium text-slate-600 hover:text-slate-900 border border-slate-200 hover:border-slate-300 px-3 h-7 rounded-lg transition-all"
+              >
                 <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
                 </svg>
-                Saved
-              </span>
-            )}
-            <button
-              onClick={saveCompany}
-              disabled={companySaving || !companyContent.trim()}
-              className="flex items-center gap-2 h-8 px-4 bg-violet-600 hover:bg-violet-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium text-xs rounded-xl transition-colors shadow-sm"
-            >
-              {companySaving && <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
-              {companySaving ? "Saving…" : "Save Company Context"}
-            </button>
+                Upload .md file
+              </button>
+              <input
+                ref={companyFileRef}
+                type="file"
+                accept=".md,.txt"
+                className="hidden"
+                onChange={(e) => handleFileUpload(e, setCompanyContent, setCompanyFile)}
+              />
+              {companyFile && (
+                <span className="text-[11px] text-slate-400 italic">Loaded from: {companyFile}</span>
+              )}
+            </div>
+            <div className="flex items-center gap-3">
+              {companySaved && (
+                <span className="flex items-center gap-1 text-xs text-emerald-600 font-medium">
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                  </svg>
+                  Saved
+                </span>
+              )}
+              <button
+                onClick={saveCompany}
+                disabled={companySaving || !companyContent.trim()}
+                className="flex items-center gap-2 h-8 px-4 bg-violet-600 hover:bg-violet-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium text-xs rounded-xl transition-colors shadow-sm"
+              >
+                {companySaving && <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
+                {companySaving ? "Saving…" : "Save Company Context"}
+              </button>
+            </div>
           </div>
-        </div>
+        )}
 
         <textarea
           value={companyContent}
-          onChange={(e) => setCompanyContent(e.target.value)}
+          onChange={(e) => canEdit && setCompanyContent(e.target.value)}
+          readOnly={!canEdit}
           rows={8}
-          className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-900 placeholder-slate-400 font-mono resize-y focus:outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-500/10 transition-all"
+          className={cn(
+            "w-full border border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-900 placeholder-slate-400 font-mono transition-all",
+            canEdit
+              ? "bg-slate-50 resize-y focus:outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-500/10"
+              : "bg-slate-50/50 resize-none cursor-default text-slate-600"
+          )}
           placeholder={company ? "" : "Describe your engineering org, infrastructure, conventions, and cross-service patterns..."}
         />
 
@@ -602,7 +628,7 @@ export default function SettingsPage() {
   const tabs: { id: Tab; label: string; adminOnly?: boolean }[] = [
     { id: "account", label: "Account" },
     { id: "integrations", label: "Integrations" },
-    ...(user?.agentContextEnabled ? [{ id: "agent-context" as Tab, label: "Agent Context", adminOnly: true }] : []),
+    { id: "agent-context" as Tab, label: "Agent Context" },
   ];
 
   return (
@@ -711,38 +737,27 @@ export default function SettingsPage() {
       {tab === "integrations" && (
         <div className="space-y-4">
           {/* GitHub Card */}
-          <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm flex items-start gap-4">
-            <div className="w-10 h-10 rounded-xl bg-slate-900 flex items-center justify-center shrink-0">
-              <GithubLogo className="w-5 h-5 text-white" />
+          <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm flex items-start gap-4 opacity-60">
+            <div className="w-10 h-10 rounded-xl bg-slate-200 flex items-center justify-center shrink-0">
+              <GithubLogo className="w-5 h-5 text-slate-400" />
             </div>
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 mb-0.5">
-                <h3 className="text-sm font-semibold text-slate-900">GitHub</h3>
-                {user?.hasGithubToken ? (
-                  <span className="text-[10px] font-medium text-emerald-600 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
-                    Connected
-                  </span>
-                ) : (
-                  <span className="text-[10px] font-medium text-slate-400 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded-full">
-                    Not connected
-                  </span>
-                )}
+                <h3 className="text-sm font-semibold text-slate-500">GitHub</h3>
+                <span className="text-[10px] font-semibold text-violet-600 bg-violet-50 border border-violet-200 px-2 py-0.5 rounded-full">
+                  Coming Soon
+                </span>
               </div>
-              <p className="text-xs text-slate-500 leading-relaxed">
-                {user?.hasGithubToken
-                  ? `${user.githubRepos?.length ?? 0} repo${(user.githubRepos?.length ?? 0) !== 1 ? "s" : ""} connected — AI will use your codebase as context.`
-                  : "Connect a GitHub repo so AI-generated plans use your actual codebase as context."}
+              <p className="text-xs text-slate-400 leading-relaxed">
+                Connect a GitHub repo so AI-generated plans use your actual codebase as context.
               </p>
             </div>
-            <Link
-              href="/settings/integrations/github"
-              className="shrink-0 h-8 px-3.5 flex items-center gap-1.5 text-xs font-medium text-slate-700 bg-white border border-slate-200 hover:border-slate-300 hover:bg-slate-50 rounded-lg transition-all"
-            >
-              {user?.hasGithubToken ? "Configure" : "Connect"}
+            <div className="shrink-0 h-8 px-3.5 flex items-center gap-1.5 text-xs font-medium text-slate-400 bg-slate-50 border border-slate-200 rounded-lg cursor-not-allowed select-none">
+              Connect
               <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
               </svg>
-            </Link>
+            </div>
           </div>
 
           {/* Linear Card */}
@@ -783,8 +798,8 @@ export default function SettingsPage() {
       )}
 
       {/* ── Agent Context Tab ── */}
-      {tab === "agent-context" && user?.agentContextEnabled && (
-        <AgentContextTab userEmail={user.email} />
+      {tab === "agent-context" && (
+        <AgentContextTab userEmail={user?.email ?? ""} canEdit={user?.agentContextEnabled ?? false} />
       )}
     </div>
   );

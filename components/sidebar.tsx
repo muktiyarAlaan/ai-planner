@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useState } from "react";
 import { useAuth } from "@/components/auth-provider";
 import { cn } from "@/lib/utils";
 
@@ -48,6 +49,7 @@ const navItems: NavItem[] = [
 export function Sidebar() {
   const pathname      = usePathname();
   const { user, signOut } = useAuth();
+  const [imgError, setImgError] = useState(false);
 
   return (
     <aside className="w-56 h-screen bg-[#111827] flex flex-col fixed left-0 top-0 z-10">
@@ -112,12 +114,13 @@ export function Sidebar() {
         {/* User */}
         {user && (
           <div className="flex items-center gap-2.5 px-3 py-3">
-            {user.image ? (
+            {user.image && !imgError ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
                 src={user.image}
                 alt={user.name ?? "User"}
                 className="w-7 h-7 rounded-full shrink-0 ring-1 ring-white/10"
+                onError={() => setImgError(true)}
               />
             ) : (
               <div className="w-7 h-7 rounded-full bg-[#7C3AED]/40 border border-[#7C3AED]/30 flex items-center justify-center shrink-0">

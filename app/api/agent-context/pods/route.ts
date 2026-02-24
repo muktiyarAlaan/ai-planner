@@ -22,10 +22,6 @@ export async function POST(req: Request) {
   if (!session?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  if (!session.agentContextEnabled) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
-
   const { podName, content } = await req.json() as { podName: string; content: string };
   if (!podName?.trim() || !content?.trim()) {
     return NextResponse.json({ error: "podName and content are required" }, { status: 400 });

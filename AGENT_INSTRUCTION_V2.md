@@ -224,6 +224,62 @@ Cross-consistency requirement:
 - If an entity is added, ensure affected APIs and flow steps reflect it.
 - If auth-sensitive operations exist, ensure auth expectations are reflected consistently.
 
+### Ticket Generation Quality
+
+**Every ticket must be self-explanatory** — a developer who has never read the plan must understand what to build from the ticket alone. Descriptions are rich markdown with headings, tables, and code blocks.
+
+**Hierarchy and structure:**
+- `Epic` (top-level, one per feature): the overview ticket. Contains Overview, Core Concepts, Architecture, Phases, Database Tables, Key Design Decisions, and Success Criteria sections.
+- `Epic` (phase-level, children of the overview): one per implementation phase. Contains Overview (what it delivers and what depends on it), Scope (broken down by area: Database, Entities, APIs, Caching, etc.), Database Tables, and Exit Criteria sections.
+- `Story` (leaf, children of a phase Epic): one vertical slice per PR. Contains a one-sentence summary, Dependencies, Files to Create, Endpoints table (if API work), DTOs with actual TypeScript class-validator code (if applicable), and Cache Invalidation (if applicable).
+- Scale: simple CRUD = 1 overview Epic + 2–3 phase Epics + 4–8 Stories; auth/RBAC/multi-actor = 1 overview Epic + 3–5 phase Epics + 8–14 Stories.
+
+**Overview Epic description must include:**
+- `## Overview` — what this feature builds and why; what it replaces or improves.
+- `## Core Concepts` — key domain terms with definitions, naming conventions, and scope boundaries.
+- `## Architecture` — which service/layer owns what, caching strategy if relevant.
+- `## Phases` — numbered list of phase names with one-line description each.
+- `## Database Tables` — markdown table: table name + purpose.
+- `## Key Design Decisions` — each decision with its rationale.
+- `## Success Criteria` — measurable outcomes with numbers where possible.
+
+**Phase Epic description must include:**
+- `## Overview` — what this phase delivers and which subsequent phases depend on it.
+- `## Scope` — bullet per area (Database, Entities, APIs, Caching, Seed, etc.) with concrete deliverables named.
+- `## Database Tables` — markdown table when DB work is in scope.
+- `## Exit Criteria` — specific testable conditions (not vague goals), including at least one failure/security condition.
+
+**Story description must include:**
+- One sentence: what to implement and which entity/endpoint it relates to.
+- `## Dependencies` — which parent story or Epic must be complete first.
+- `## Files to Create` — exact file paths.
+- `## Endpoints` — markdown table (Method | Path | Description) for any API work.
+- `## DTOs` — TypeScript code block with class-validator decorators for any DTO work.
+- `## Cache Invalidation` — which keys are invalidated and under what conditions (omit if not applicable).
+
+**Acceptance criteria rules:**
+- Every criterion is independently testable — no vague phrasing like "works correctly" or "handles errors".
+- Reference specific entity names, field names, status values, or HTTP codes from the plan.
+- Every ticket must include at least one failure/rejection criterion (e.g., "Returns 403 when permission not found", "Returns 409 on duplicate slug").
+- Minimum 3 criteria per Epic, minimum 2 per Story.
+
+**Alignment requirement (non-negotiable):**
+- Every entity in the ERD must appear in at least one ticket description.
+- Every API endpoint must be implemented by at least one Story.
+- Every user flow step labeled "System:" must correspond to an acceptance criterion or Story task.
+- Phase Epic titles must name the phase and owning service (e.g., "Phase 1: Foundation (Identity Service)").
+- Story titles must name the specific deliverable — not restate the Epic title.
+
+**Ticket generation checklist — validate before outputting:**
+1. Top-level Epic has all 7 required sections (Overview, Core Concepts, Architecture, Phases, DB Tables, Key Decisions, Success Criteria) ✓
+2. Each Phase Epic has Overview, Scope, DB Tables (if applicable), and Exit Criteria ✓
+3. Each Story has one-sentence summary + Dependencies + Files to Create + Endpoints/DTOs (where applicable) ✓
+4. Every acceptance criterion references specific names/values from the plan ✓
+5. Every ticket has at least one failure/rejection acceptance criterion ✓
+6. No entity from the ERD is orphaned (uncovered by tickets) ✓
+7. No API endpoint is orphaned (uncovered by tickets) ✓
+8. Ticket count matches feature complexity ✓
+
 ---
 
 ## MODE C: Plan Chat and Controlled Editing Contract

@@ -11,9 +11,6 @@ export async function PUT(
   if (!session?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  if (!session.agentContextEnabled) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
 
   const podName = decodeURIComponent(params.podName);
   const { content } = await req.json() as { content: string };
@@ -38,9 +35,6 @@ export async function DELETE(
   const session = await getSession();
   if (!session?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-  if (!session.agentContextEnabled) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
   const podName = decodeURIComponent(params.podName);

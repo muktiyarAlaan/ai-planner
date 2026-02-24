@@ -77,6 +77,44 @@ export async function POST(req: Request) {
       .filter(Boolean)
       .join("\n\n");
 
+    const ticketSchema = [
+      '"linearTickets": [',
+      '  {',
+      '    "title": "<Feature Name>: Overview & Rollout Plan",',
+      '    "type": "Epic",',
+      '    "description": "## Overview\\n<2-3 sentences: what this feature builds and why it exists. State what it replaces or improves.>\\n\\n## Core Concepts\\n- **<Concept>**: <definition — include naming conventions, scope boundaries, or key distinctions>\\n- **<Concept>**: <definition>\\n\\n## Architecture\\n- **<Service/Layer>**: <what it owns in this feature and why>\\n- **<Cache/Package>**: <purpose and invalidation strategy if relevant>\\n\\n## Phases\\n1. **<Phase Name>** — <one-line description of what it delivers>\\n2. **<Phase Name>** — <one-line description>\\n\\n## Database Tables\\n| Table | Purpose |\\n|---|---|\\n| table_name | what it stores and who owns it |\\n\\n## Key Design Decisions\\n- <decision and its rationale, e.g. Fail closed — deny by default unless permission explicitly granted>\\n- <decision>\\n\\n## Success Criteria\\n- <measurable outcome>\\n- <performance target with number, e.g. Permission resolution returns within 50ms when cached>\\n- <security/correctness criterion>",',
+      '    "acceptanceCriteria": [',
+      '      "<Specific measurable outcome referencing entity name, field, or HTTP code>",',
+      '      "<Performance criterion with numeric target>",',
+      '      "<Failure/security criterion: e.g. Returns 403 when user lacks required permission>"',
+      '    ],',
+      '    "children": [',
+      '      {',
+      '        "title": "Phase 1: <Phase Name> (<Service Name>)",',
+      '        "type": "Epic",',
+      '        "description": "## Overview\\n<What this phase builds. Explicitly state which subsequent phases depend on it being complete.>\\n\\n## Scope\\n- **Database**: <migration files, table names>\\n- **Entities**: <Sequelize model names and associations>\\n- **APIs**: <endpoint list or description>\\n- **Caching**: <what is cached, TTL, invalidation triggers>\\n\\n## Database Tables\\n| Table | Purpose |\\n|---|---|\\n| table_name | what it stores |\\n\\n## Exit Criteria\\n- <specific testable condition, e.g. All migrations run cleanly on a fresh DB>\\n- <specific testable condition, e.g. Seed runner idempotently creates initial catalog without duplicates>\\n- <failure condition, e.g. Admin APIs return 403 for non-Admin roles>",',
+      '        "acceptanceCriteria": [',
+      '          "<Specific criterion with entity/field name>",',
+      '          "<Failure criterion with HTTP code or error type>"',
+      '        ],',
+      '        "children": [',
+      '          {',
+      '            "title": "<Specific deliverable a developer ships in one PR>",',
+      '            "type": "Story",',
+      '            "description": "<One sentence: what to implement and which entity/endpoint it relates to.>\\n\\n## Dependencies\\n- Depends on: <parent story or epic title>\\n\\n## Files to Create\\n- src/resources/module/controller.ts\\n- src/resources/module/service.ts\\n- src/resources/module/dto/create-resource.dto.ts\\n\\n## Endpoints\\n| Method | Path | Description |\\n|---|---|---|\\n| POST | /resource | Create resource |\\n| GET | /resource/:id | Get resource by ID |\\n\\n## DTOs\\nclass CreateResourceDto {\\n  @IsString() @IsNotEmpty() name: string;\\n  @IsOptional() @IsUUID(4) parentId?: string;\\n}\\n\\n## Cache Invalidation\\n<List exactly which cache keys are invalidated and under what conditions. Omit section if not applicable.>",',
+      '            "acceptanceCriteria": [',
+      '              "<Specific criterion with field name, status value, or HTTP code from this plan>",',
+      '              "<Failure criterion: e.g. Returns 400 when required field X is absent>",',
+      '              "<Data integrity criterion: e.g. Unique constraint on (roleId, permissionId) — 409 on duplicate>"',
+      '            ]',
+      '          }',
+      '        ]',
+      '      }',
+      '    ]',
+      '  }',
+      ']',
+    ].join("\n");
+
     const prompt = `${contextBlock ? `${contextBlock}\n\n` : ""}## Requirement
 ${requirement}
 
@@ -269,23 +307,20 @@ Generate a comprehensive technical plan. Return ONLY a JSON object with this exa
     }
   ],
 
-  "linearTickets": [
-    {
-      "title": "Ticket title",
-      "type": "Epic",
-      "description": "Full ticket description with context",
-      "acceptanceCriteria": ["criteria 1", "criteria 2"],
-      "children": [
-        {
-          "title": "Sub-task title",
-          "type": "Story",
-          "description": "Description",
-          "acceptanceCriteria": ["criteria 1"]
-        }
-      ]
-    }
-  ]
+  ${ticketSchema}
 }
+
+CRITICAL — Ticket quality rules (enforce on EVERY ticket generated):
+- description is RICH MARKDOWN. Use ## headings, bullet lists, tables, and code blocks as shown in the schema above.
+- The top-level Epic is the feature overview ticket: it MUST have Overview, Core Concepts, Architecture, Phases, Database Tables, Key Design Decisions, and Success Criteria sections.
+- Phase Epics (children of the overview Epic) MUST have Overview, Scope (broken down by area), Database Tables, and Exit Criteria sections.
+- Story tickets MUST have: Dependencies, Files to Create, Endpoints (if API work), DTOs with actual TypeScript class-validator code (if applicable), and Cache Invalidation (if applicable).
+- Every acceptance criterion MUST reference specific entity names, field names, status values, or HTTP codes from this plan. No vague phrasing like "works correctly" or "handles errors".
+- Every ticket MUST include at least one failure/rejection acceptance criterion.
+- Epics: minimum 3 acceptance criteria. Stories: minimum 2 acceptance criteria.
+- Every entity in the ERD must appear in at least one ticket.
+- Every API endpoint must be implemented by at least one Story.
+- Scale: simple CRUD = 1 overview Epic + 2-3 phase Epics + 4-8 Stories; auth/RBAC/multi-actor = 1 overview Epic + 3-5 phase Epics + 8-14 Stories.
 
 ERD positioning: spread entities horizontally with ~390px gaps, vertically with ~320px gaps. Positions are auto-corrected server-side, but still aim for a logical left-to-right or top-to-bottom reading order.
 
