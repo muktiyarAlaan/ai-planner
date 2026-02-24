@@ -9,15 +9,20 @@ const nextConfig = {
       },
     ],
   },
-  // Let Next.js handle pg/sequelize via its own output file tracing.
-  // Do NOT add pg/pg-hstore to webpack externals — that prevents Vercel from
-  // bundling them into the serverless function, causing "Please install pg manually".
+  // Sequelize dynamically requires 'pg' at runtime via ConnectionManager.
+  // Vercel's static output file tracer cannot detect dynamic requires, so
+  // pg/pg-hstore never make it into the serverless bundle automatically.
+  // outputFileTracingIncludes forces them into every API route bundle.
+  outputFileTracingIncludes: {
+    "**/*": [
+      "./node_modules/pg/**/*",
+      "./node_modules/pg-hstore/**/*",
+    ],
+  },
   serverExternalPackages: ["sequelize", "sequelize-typescript", "pg", "pg-hstore"],
   webpack: (config, { isServer }) => {
     if (isServer) {
-      // Only exclude pg-native — it's an optional C++ binary that doesn't exist
-      // on Vercel. pg/pg-hstore/sequelize must NOT be excluded here or Vercel's
-      // serverless functions won't find them at runtime ("Please install pg manually").
+      // Only exclude pg-native — optional C++ binary, not present on Vercel.
       config.externals = [
         ...(Array.isArray(config.externals) ? config.externals : [config.externals].filter(Boolean)),
         "pg-native",
