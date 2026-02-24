@@ -217,7 +217,7 @@ export default function GithubSettingsPage() {
                   </div>
                 </>
               ) : (
-                <p className="text-sm text-slate-500 mb-6">No repos selected yet. Click "Change repos" to select.</p>
+                <p className="text-sm text-slate-500 mb-6">No repos selected yet. Click &quot;Change repos&quot; to select.</p>
               )}
 
               {error && (

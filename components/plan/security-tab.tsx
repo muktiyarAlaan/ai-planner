@@ -433,9 +433,12 @@ export function SecurityTab({ planId, initialReview, readOnly = false }: Props) 
   const [statusFilter,   setStatusFilter]   = useState<SecurityStatus | null>(null);
   const [categoryFilter, setCategoryFilter] = useState<SecurityCategory | null>(null);
 
-  const sorted = review
-    ? [...review.checklist].sort((a, b) => STATUS_ORDER[a.status] - STATUS_ORDER[b.status])
-    : [];
+  const sorted = useMemo(
+    () => review
+      ? [...review.checklist].sort((a, b) => STATUS_ORDER[a.status] - STATUS_ORDER[b.status])
+      : [],
+    [review]
+  );
 
   // Present categories
   const presentCategories = useMemo(() => {
