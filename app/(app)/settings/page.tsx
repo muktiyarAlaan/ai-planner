@@ -219,7 +219,7 @@ function DeleteConfirm({ podName, onConfirm, onCancel }: { podName: string; onCo
 
 // ── Agent Context Tab ────────────────────────────────────────────────────────
 
-function AgentContextTab({ userEmail, canEdit }: { userEmail: string; canEdit: boolean }) {
+function AgentContextTab({ userEmail: _userEmail, canEdit }: { userEmail: string; canEdit: boolean }) {
   const [contexts, setContexts] = useState<AgentContextRow[]>([]);
   const [loading, setLoading] = useState(true);
 
