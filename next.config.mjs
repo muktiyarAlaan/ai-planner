@@ -15,7 +15,9 @@ const nextConfig = {
   serverExternalPackages: ["sequelize", "sequelize-typescript", "pg", "pg-hstore"],
   webpack: (config, { isServer }) => {
     if (isServer) {
-      // Only exclude pg-native (optional binary — never needed, never present on Vercel)
+      // Only exclude pg-native — it's an optional C++ binary that doesn't exist
+      // on Vercel. pg/pg-hstore/sequelize must NOT be excluded here or Vercel's
+      // serverless functions won't find them at runtime ("Please install pg manually").
       config.externals = [
         ...(Array.isArray(config.externals) ? config.externals : [config.externals].filter(Boolean)),
         "pg-native",
