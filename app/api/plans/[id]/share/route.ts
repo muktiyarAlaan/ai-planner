@@ -9,7 +9,7 @@ interface RouteContext {
 }
 
 // ── POST /api/plans/[id]/share — enable sharing, generate token ──────────────
-export async function POST(_req: Request, { params }: RouteContext) {
+export async function POST(req: Request, { params }: RouteContext) {
   const session = await getSession();
   if (!session?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -29,9 +29,10 @@ export async function POST(_req: Request, { params }: RouteContext) {
 
     await plan.update({ shareToken, isShared: true });
 
+    const requestUrl = new URL(req.url);
     const host =
       process.env.NEXT_PUBLIC_APP_URL ??
-      (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000");
+      requestUrl.origin;
 
     return NextResponse.json({ shareUrl: `${host}/shared/${shareToken}` });
   } catch (error) {
