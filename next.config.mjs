@@ -9,17 +9,16 @@ const nextConfig = {
       },
     ],
   },
-  // Sequelize uses some Node.js built-ins that need to be marked as external
+  // Let Next.js handle pg/sequelize via its own output file tracing.
+  // Do NOT add pg/pg-hstore to webpack externals — that prevents Vercel from
+  // bundling them into the serverless function, causing "Please install pg manually".
   serverExternalPackages: ["sequelize", "sequelize-typescript", "pg", "pg-hstore"],
   webpack: (config, { isServer }) => {
     if (isServer) {
+      // Only exclude pg-native (optional binary — never needed, never present on Vercel)
       config.externals = [
         ...(Array.isArray(config.externals) ? config.externals : [config.externals].filter(Boolean)),
-        "pg",
-        "pg-hstore",
         "pg-native",
-        "sequelize",
-        "sequelize-typescript",
       ];
     }
     return config;
